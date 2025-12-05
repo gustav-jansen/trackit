@@ -1,7 +1,8 @@
 [project]
 name = "trackit"
 version = "0.1.0"
-description = "Add your description here"
+description = """A command-line expense tracking application with CSV import,
+flexible categorization, and multi-account support"""
 readme = "README.md"
 authors = [
     { name = "Gustav R. Jansen", email = "gustav.r.jansen@gmail.com" }
