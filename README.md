@@ -88,6 +88,7 @@ pip install -e .
 7. **Categorize transactions**:
    ```bash
    trackit categorize 1 "Food & Dining > Groceries"
+   trackit categorize 1 2 3 4 5 "Food & Dining > Groceries"  # Multiple transactions
    ```
 
 8. **View summaries**:
@@ -115,7 +116,7 @@ pip install -e .
 - `trackit import <csv_file> --format <format_name>` - Import transactions from CSV
 - `trackit add --account <name_or_id> --date <date> --amount <amount> [options]` - Add transaction manually
 - `trackit view [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
-- `trackit categorize <transaction_id> <category_path>` - Assign category to transaction
+- `trackit categorize <transaction_id> [transaction_id ...] <category_path>` - Assign category to one or more transactions
 - `trackit notes <transaction_id> [<notes>] [--clear]` - Update transaction notes
 
 **Note**: Account can be specified by name or ID in most commands. Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.

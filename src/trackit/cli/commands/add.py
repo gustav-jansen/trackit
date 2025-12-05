@@ -22,7 +22,7 @@ from trackit.utils.amount_parser import parse_amount
 @click.pass_context
 def add_transaction(
     ctx,
-    account: int,
+    account: str,
     date: str,
     amount: str,
     description: str | None,

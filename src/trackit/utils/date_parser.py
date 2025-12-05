@@ -42,7 +42,9 @@ def parse_date(date_str: str) -> date:
         elif period == "year":
             return today.replace(month=1, day=1) - relativedelta(years=1)
         elif period == "week":
-            return today - timedelta(days=7)
+            # Return Monday of last week (for consistency with "this week" and "next week")
+            days_since_monday = today.weekday()
+            return today - timedelta(days=days_since_monday + 7)
         elif period in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
             # Last Monday, etc.
             days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -76,4 +78,3 @@ def parse_date(date_str: str) -> date:
         return dt.date()
     except (ValueError, TypeError) as e:
         raise ValueError(f"Could not parse date '{date_str}': {e}")
-

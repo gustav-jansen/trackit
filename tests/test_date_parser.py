@@ -41,6 +41,18 @@ def test_parse_last_month():
     assert result == expected
 
 
+def test_parse_last_week():
+    """Test parsing 'last week'."""
+    result = parse_date("last week")
+    # Should be Monday of last week (for consistency with "this week" and "next week")
+    today = date.today()
+    days_since_monday = today.weekday()
+    expected = today - timedelta(days=days_since_monday + 7)
+    assert result == expected
+    # Verify it's a Monday (weekday 0)
+    assert result.weekday() == 0
+
+
 def test_parse_this_month():
     """Test parsing 'this month'."""
     result = parse_date("this month")

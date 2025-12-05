@@ -347,7 +347,7 @@ def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_accou
 
 
 def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
-    """Test categorizing a transaction."""
+    """Test categorizing a single transaction (backward compatibility)."""
     from datetime import date
     from decimal import Decimal
     
@@ -372,6 +372,135 @@ def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_cate
     
     assert result.exit_code == 0
     assert "categorized" in result.output.lower()
+
+
+def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test categorizing multiple transactions."""
+    from datetime import date
+    from decimal import Decimal
+    
+    # Create multiple transactions
+    txn_ids = []
+    for i in range(3):
+        txn_id = transaction_service.create_transaction(
+            unique_id=f"TXN{i+1:03d}",
+            account_id=sample_account["id"],
+            date=date(2024, 1, 15 + i),
+            amount=Decimal(f"-{10 * (i+1)}.00"),
+            description=f"Transaction {i+1}",
+        )
+        txn_ids.append(txn_id)
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            str(txn_ids[0]),
+            str(txn_ids[1]),
+            str(txn_ids[2]),
+            "Food & Dining > Groceries",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "Categorizing 3 transactions" in result.output
+    assert "succeeded" in result.output.lower()
+    assert "failed" in result.output.lower() or "0 failed" in result.output
+
+
+def test_categorize_with_invalid_ids(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test categorizing with mix of valid and invalid transaction IDs."""
+    from datetime import date
+    from decimal import Decimal
+    
+    # Create one valid transaction
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account["id"],
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+    )
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            str(txn_id),
+            "99999",  # Invalid ID
+            "Food & Dining > Groceries",
+        ],
+    )
+    
+    assert result.exit_code == 1  # Should exit with error due to failures
+    assert "Categorizing 2 transactions" in result.output
+    assert "succeeded" in result.output.lower()
+    assert "failed" in result.output.lower()
+
+
+def test_categorize_with_invalid_category(cli_runner, temp_db, sample_account, transaction_service):
+    """Test categorizing with invalid category."""
+    from datetime import date
+    from decimal import Decimal
+    
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account["id"],
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+    )
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            str(txn_id),
+            "Non Existent Category",
+        ],
+    )
+    
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+
+
+def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test categorizing with duplicate transaction IDs."""
+    from datetime import date
+    from decimal import Decimal
+    
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account["id"],
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+    )
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            str(txn_id),
+            str(txn_id),  # Duplicate
+            str(txn_id),  # Another duplicate
+            "Food & Dining > Groceries",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    # After removing duplicates, only one unique ID remains, so it uses single-transaction format
+    assert "categorized" in result.output.lower()
+    assert "Food & Dining > Groceries" in result.output
+    # Should only process once despite duplicates (no error about duplicate processing)
 
 
 def test_notes_add(cli_runner, temp_db, sample_account, transaction_service):
