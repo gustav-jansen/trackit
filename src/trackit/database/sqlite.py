@@ -25,8 +25,13 @@ class SQLiteDatabase(Database):
         """Initialize SQLite database.
 
         Args:
-            database_path: Path to SQLite database file. If None, uses default location.
+            database_path: Path to SQLite database file. If None, checks TRACKIT_DB_PATH
+                environment variable, then defaults to ~/.trackit/trackit.db
         """
+        if database_path is None:
+            # Check environment variable
+            database_path = os.environ.get("TRACKIT_DB_PATH")
+
         if database_path is None:
             # Default to ~/.trackit/trackit.db
             home = Path.home()

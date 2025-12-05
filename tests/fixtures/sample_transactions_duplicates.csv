@@ -1,0 +1,4 @@
+Transaction ID,Date,Amount,Description,Reference
+TXN001,2024-01-15,-50.00,Grocery Store,REF001
+TXN001,2024-01-15,-50.00,Grocery Store Duplicate,REF001
+

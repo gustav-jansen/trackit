@@ -1,6 +1,6 @@
 """SQLAlchemy models for trackit database."""
 
-from datetime import datetime, date
+from datetime import datetime, date, UTC
 from decimal import Decimal
 from typing import Optional
 from sqlalchemy import (
@@ -15,8 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker, Session
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, Session
 
 Base = declarative_base()
 
@@ -29,7 +28,7 @@ class Account(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     bank_name = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     # Relationships
     csv_formats = relationship("CSVFormat", back_populates="account", cascade="all, delete-orphan")
@@ -44,7 +43,7 @@ class CSVFormat(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     # Relationships
     account = relationship("Account", back_populates="csv_formats")
@@ -76,7 +75,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     # Relationships
     parent = relationship("Category", remote_side=[id], backref="children")
@@ -97,7 +96,7 @@ class Transaction(Base):
     reference_number = Column(String, nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     notes = Column(String, nullable=True)
-    imported_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    imported_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     # Unique constraint on account_id + unique_id
     __table_args__ = (UniqueConstraint("account_id", "unique_id", name="uq_account_unique_id"),)

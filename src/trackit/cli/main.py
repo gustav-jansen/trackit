@@ -18,8 +18,14 @@ from trackit.cli.commands import (
 
 
 @click.group()
+@click.option(
+    "--db-path",
+    type=click.Path(),
+    help="Path to database file (overrides TRACKIT_DB_PATH environment variable)",
+    envvar="TRACKIT_DB_PATH",
+)
 @click.pass_context
-def cli(ctx):
+def cli(ctx, db_path: str | None):
     """Trackit - Expense tracking application.
     
     Track and categorize your expenses with support for importing CSV files
@@ -30,7 +36,7 @@ def cli(ctx):
     # Initialize database connection only when actually running a command
     # (not when showing help)
     if ctx.invoked_subcommand is not None:
-        db = SQLiteDatabase()
+        db = SQLiteDatabase(database_path=db_path)
         db.connect()
         db.initialize_schema()
         ctx.obj["db"] = db
