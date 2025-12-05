@@ -256,7 +256,7 @@ This separation makes it easy to add a web interface or other UIs in the future 
 
 ## License
 
-[Add your license here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
