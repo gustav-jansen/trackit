@@ -7,7 +7,11 @@ authors = [
     { name = "Gustav R. Jansen", email = "gustav.r.jansen@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "click>=8.1.0",
+    "sqlalchemy>=2.0.0",
+    "python-dateutil>=2.8.0",
+]
 
 [project.scripts]
 trackit = "trackit:main"

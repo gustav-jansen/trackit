@@ -1,0 +1,58 @@
+"""Main CLI entry point."""
+
+import click
+from trackit.database.sqlite import SQLiteDatabase
+
+# Import and register all commands at module level
+from trackit.cli.commands import (
+    account,
+    format,
+    import_cmd,
+    categorize,
+    view,
+    summary,
+    init_categories,
+    category,
+    add,
+)
+
+
+@click.group()
+@click.pass_context
+def cli(ctx):
+    """Trackit - Expense tracking application.
+    
+    Track and categorize your expenses with support for importing CSV files
+    from multiple banks with different formats.
+    """
+    ctx.ensure_object(dict)
+    
+    # Initialize database connection only when actually running a command
+    # (not when showing help)
+    if ctx.invoked_subcommand is not None:
+        db = SQLiteDatabase()
+        db.connect()
+        db.initialize_schema()
+        ctx.obj["db"] = db
+
+
+# Register all commands
+account.register_commands(cli)
+format.register_commands(cli)
+import_cmd.register_commands(cli)
+categorize.register_commands(cli)
+view.register_commands(cli)
+summary.register_commands(cli)
+init_categories.register_commands(cli)
+category.register_commands(cli)
+add.register_commands(cli)
+
+
+def main():
+    """Main entry point for CLI."""
+    cli()
+
+
+if __name__ == "__main__":
+    main()
+

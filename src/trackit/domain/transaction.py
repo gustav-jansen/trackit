@@ -1,0 +1,185 @@
+"""Transaction domain service."""
+
+from typing import Optional
+from datetime import date
+from decimal import Decimal
+from trackit.database.base import Database
+
+
+class TransactionService:
+    """Service for managing transactions."""
+
+    def __init__(self, db: Database):
+        """Initialize transaction service.
+
+        Args:
+            db: Database instance
+        """
+        self.db = db
+
+    def create_transaction(
+        self,
+        unique_id: str,
+        account_id: int,
+        date: date,
+        amount: Decimal,
+        description: Optional[str] = None,
+        reference_number: Optional[str] = None,
+        category_id: Optional[int] = None,
+        notes: Optional[str] = None,
+    ) -> int:
+        """Create a transaction.
+
+        Args:
+            unique_id: Unique transaction ID from CSV
+            account_id: Account ID
+            date: Transaction date
+            amount: Transaction amount
+            description: Optional description
+            reference_number: Optional reference number
+            category_id: Optional category ID
+            notes: Optional notes
+
+        Returns:
+            Transaction ID
+
+        Raises:
+            ValueError: If account doesn't exist or transaction already exists
+        """
+        # Verify account exists
+        account = self.db.get_account(account_id)
+        if account is None:
+            raise ValueError(f"Account {account_id} not found")
+
+        # Check for duplicate
+        if self.db.transaction_exists(account_id, unique_id):
+            raise ValueError(
+                f"Transaction with unique_id '{unique_id}' already exists for account {account_id}"
+            )
+
+        # Verify category if provided
+        if category_id is not None:
+            category = self.db.get_category(category_id)
+            if category is None:
+                raise ValueError(f"Category {category_id} not found")
+
+        return self.db.create_transaction(
+            unique_id=unique_id,
+            account_id=account_id,
+            date=date,
+            amount=amount,
+            description=description,
+            reference_number=reference_number,
+            category_id=category_id,
+            notes=notes,
+        )
+
+    def get_transaction(self, transaction_id: int) -> Optional[dict]:
+        """Get transaction by ID.
+
+        Args:
+            transaction_id: Transaction ID
+
+        Returns:
+            Transaction dict or None if not found
+        """
+        return self.db.get_transaction(transaction_id)
+
+    def update_category(self, transaction_id: int, category_path: Optional[str]) -> None:
+        """Update transaction category.
+
+        Args:
+            transaction_id: Transaction ID
+            category_path: Category path (e.g., "Food & Dining > Groceries") or None
+
+        Raises:
+            ValueError: If transaction or category doesn't exist
+        """
+        # Verify transaction exists
+        txn = self.db.get_transaction(transaction_id)
+        if txn is None:
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        category_id = None
+        if category_path is not None:
+            category = self.db.get_category_by_path(category_path)
+            if category is None:
+                raise ValueError(f"Category '{category_path}' not found")
+            category_id = category["id"]
+
+        self.db.update_transaction_category(transaction_id, category_id)
+
+    def update_notes(self, transaction_id: int, notes: Optional[str]) -> None:
+        """Update transaction notes.
+
+        Args:
+            transaction_id: Transaction ID
+            notes: Notes text or None
+
+        Raises:
+            ValueError: If transaction doesn't exist
+        """
+        # Verify transaction exists
+        txn = self.db.get_transaction(transaction_id)
+        if txn is None:
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        self.db.update_transaction_notes(transaction_id, notes)
+
+    def list_transactions(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category_path: Optional[str] = None,
+        account_id: Optional[int] = None,
+    ) -> list[dict]:
+        """List transactions with filters.
+
+        Args:
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            category_path: Optional category path filter
+            account_id: Optional account ID filter
+
+        Returns:
+            List of transaction dicts
+        """
+        category_id = None
+        if category_path is not None:
+            category = self.db.get_category_by_path(category_path)
+            if category is not None:
+                category_id = category["id"]
+
+        return self.db.list_transactions(
+            start_date=start_date,
+            end_date=end_date,
+            category_id=category_id,
+            account_id=account_id,
+        )
+
+    def get_summary(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category_path: Optional[str] = None,
+    ) -> list[dict]:
+        """Get category summary.
+
+        Args:
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            category_path: Optional category path filter
+
+        Returns:
+            List of summary dicts
+        """
+        category_id = None
+        if category_path is not None:
+            category = self.db.get_category_by_path(category_path)
+            if category is not None:
+                category_id = category["id"]
+
+        return self.db.get_category_summary(
+            start_date=start_date, end_date=end_date, category_id=category_id
+        )
+

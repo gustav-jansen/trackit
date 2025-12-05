@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from trackit!")
+from trackit.cli.main import main
