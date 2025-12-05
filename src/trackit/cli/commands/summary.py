@@ -6,8 +6,8 @@ from trackit.utils.date_parser import parse_date
 
 
 @click.command("summary")
-@click.option("--start-date", help="Start date (YYYY-MM-DD)")
-@click.option("--end-date", help="End date (YYYY-MM-DD)")
+@click.option("--start-date", help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')")
+@click.option("--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')")
 @click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries')")
 @click.pass_context
 def summary(ctx, start_date: str, end_date: str, category: str):

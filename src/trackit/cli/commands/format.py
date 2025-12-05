@@ -13,15 +13,24 @@ def format_group():
 
 @format_group.command("create")
 @click.argument("name")
-@click.option("--account", required=True, type=int, help="Account ID")
+@click.option("--account", required=True, help="Account name or ID")
 @click.pass_context
-def create_format(ctx, name: str, account: int):
+def create_format(ctx, name: str, account: str):
     """Create a new CSV format."""
     db = ctx.obj["db"]
     service = CSVFormatService(db)
+    account_service = AccountService(db)
+
+    # Resolve account name to ID
+    try:
+        from trackit.utils.account_resolver import resolve_account
+        account_id = resolve_account(account_service, account)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
 
     try:
-        format_id = service.create_format(name=name, account_id=account)
+        format_id = service.create_format(name=name, account_id=account_id)
         click.echo(f"Created CSV format '{name}' (ID: {format_id})")
         click.echo("Use 'format map' to add column mappings.")
     except ValueError as e:
@@ -62,14 +71,24 @@ def map_column(ctx, format_name: str, csv_column: str, db_field: str, required: 
 
 
 @format_group.command("list")
-@click.option("--account", type=int, help="Filter by account ID")
+@click.option("--account", help="Filter by account name or ID")
 @click.pass_context
 def list_formats(ctx, account):
     """List CSV formats."""
     db = ctx.obj["db"]
     service = CSVFormatService(db)
+    account_service = AccountService(db)
 
-    formats = service.list_formats(account_id=account)
+    account_id = None
+    if account:
+        try:
+            from trackit.utils.account_resolver import resolve_account
+            account_id = resolve_account(account_service, account)
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
+            ctx.exit(1)
+
+    formats = service.list_formats(account_id=account_id)
     if not formats:
         click.echo("No CSV formats found.")
         return

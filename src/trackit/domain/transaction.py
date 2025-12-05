@@ -138,23 +138,29 @@ class TransactionService:
         Args:
             start_date: Optional start date filter
             end_date: Optional end date filter
-            category_path: Optional category path filter
+            category_path: Optional category path filter (empty string for uncategorized)
             account_id: Optional account ID filter
 
         Returns:
             List of transaction dicts
         """
         category_id = None
+        uncategorized = False
         if category_path is not None:
-            category = self.db.get_category_by_path(category_path)
-            if category is not None:
-                category_id = category["id"]
+            if category_path == "":
+                # Empty string means uncategorized
+                uncategorized = True
+            else:
+                category = self.db.get_category_by_path(category_path)
+                if category is not None:
+                    category_id = category["id"]
 
         return self.db.list_transactions(
             start_date=start_date,
             end_date=end_date,
             category_id=category_id,
             account_id=account_id,
+            uncategorized=uncategorized,
         )
 
     def get_summary(

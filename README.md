@@ -59,7 +59,8 @@ pip install -e .
 
 3. **Create a CSV format** for your bank's export format:
    ```bash
-   trackit format create "Chase Format" --account 1
+   trackit format create "Chase Format" --account "Chase"
+   # or use account ID: trackit format create "Chase Format" --account 1
    ```
 
 4. **Map CSV columns** to database fields:
@@ -80,6 +81,8 @@ pip install -e .
    trackit view
    trackit view --start-date 2024-01-01 --end-date 2024-01-31
    trackit view --category "Food & Dining > Groceries" --verbose
+   trackit view --account "Chase" --uncategorized
+   trackit view --start-date "last month" --end-date "today"
    ```
 
 7. **Categorize transactions**:
@@ -102,18 +105,20 @@ pip install -e .
 
 ### CSV Format Management
 
-- `trackit format create <name> --account <account_id>` - Create a CSV format
+- `trackit format create <name> --account <name_or_id>` - Create a CSV format
 - `trackit format map <format_name> <csv_column> <db_field> [--required]` - Map CSV columns
-- `trackit format list [--account <account_id>]` - List CSV formats
+- `trackit format list [--account <name_or_id>]` - List CSV formats
 - `trackit format show <format_name>` - Show format details
 
 ### Transaction Management
 
 - `trackit import <csv_file> --format <format_name>` - Import transactions from CSV
-- `trackit add --account <id> --date <date> --amount <amount> [options]` - Add transaction manually
-- `trackit view [--start-date <date>] [--end-date <date>] [--category <path>] [--account <id>] [--verbose]` - View transactions
+- `trackit add --account <name_or_id> --date <date> --amount <amount> [options]` - Add transaction manually
+- `trackit view [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
 - `trackit categorize <transaction_id> <category_path>` - Assign category to transaction
 - `trackit notes <transaction_id> [<notes>] [--clear]` - Update transaction notes
+
+**Note**: Account can be specified by name or ID in most commands. Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.
 
 ### Category Management
 
@@ -124,6 +129,8 @@ pip install -e .
 ### Analysis
 
 - `trackit summary [--start-date <date>] [--end-date <date>] [--category <path>]` - Show category summary
+
+**Note**: Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.
 
 ## Database
 
@@ -160,6 +167,47 @@ Categories support unlimited depth. Use `>` to separate levels in category paths
 - `Food & Dining`
 - `Food & Dining > Groceries`
 - `Food & Dining > Restaurants > Fast Food`
+
+## Features
+
+### Account Name Resolution
+
+Most commands that accept an account ID also accept an account name for convenience:
+```bash
+trackit add --account "Chase" --date today --amount -50.00
+trackit view --account "Chase"
+trackit format create "My Format" --account "Chase"
+```
+
+### Relative Dates
+
+The date parser supports relative dates for easier filtering:
+- **Simple**: `today`, `yesterday`, `tomorrow`
+- **Time periods**: `last month`, `this month`, `next month`
+- **Years**: `last year`, `this year`, `next year`
+- **Weeks**: `last week`, `this week`, `next week`
+- **Days of week**: `last monday`, `last tuesday`, etc.
+
+Examples:
+```bash
+trackit view --start-date "last month" --end-date "today"
+trackit summary --start-date "this year"
+trackit add --account "Chase" --date "yesterday" --amount -25.00
+```
+
+### Uncategorized Transactions
+
+Filter to see only transactions that haven't been categorized:
+```bash
+trackit view --uncategorized
+```
+
+### Transaction Totals
+
+The `view` command automatically displays totals at the bottom:
+- Total expenses (sum of negative amounts)
+- Total income (sum of positive amounts)
+- Transaction count
 
 ## Development
 

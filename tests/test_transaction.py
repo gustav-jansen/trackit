@@ -27,6 +27,49 @@ def test_add_transaction_minimal(cli_runner, temp_db, sample_account):
     assert "Test Account" in result.output
 
 
+def test_add_transaction_with_account_name(cli_runner, temp_db, sample_account):
+    """Test adding a transaction using account name instead of ID."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "add",
+            "--account",
+            "Test Account",
+            "--date",
+            "2024-01-15",
+            "--amount",
+            "-50.00",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "Created transaction" in result.output
+    assert "Test Account" in result.output
+
+
+def test_add_transaction_with_relative_date(cli_runner, temp_db, sample_account):
+    """Test adding a transaction with relative date."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "add",
+            "--account",
+            "Test Account",
+            "--date",
+            "today",
+            "--amount",
+            "-50.00",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "Created transaction" in result.output
+
+
 def test_add_transaction_full(cli_runner, temp_db, sample_account, sample_categories):
     """Test adding a transaction with all fields."""
     result = cli_runner.invoke(
@@ -162,6 +205,145 @@ def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, tra
     
     assert result.exit_code == 0
     assert "transaction" in result.output.lower()
+
+
+def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account, transaction_service):
+    """Test viewing transactions using account name."""
+    from datetime import date
+    from decimal import Decimal
+    
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account["id"],
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+    )
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "view",
+            "--account",
+            "Test Account",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "TXN001" in result.output or "Test Transaction" in result.output
+
+
+def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test viewing uncategorized transactions."""
+    from datetime import date
+    from decimal import Decimal
+    
+    # Create uncategorized transaction
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account["id"],
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Uncategorized Transaction",
+    )
+    
+    # Create categorized transaction (use a valid category from sample_categories)
+    if sample_categories:
+        first_category_id = list(sample_categories.values())[0]
+        transaction_service.create_transaction(
+            unique_id="TXN002",
+            account_id=sample_account["id"],
+            date=date(2024, 1, 16),
+            amount=Decimal("-25.00"),
+            description="Categorized Transaction",
+            category_id=first_category_id,
+        )
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "view",
+            "--uncategorized",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "Uncategorized Transaction" in result.output
+    if sample_categories:
+        assert "Categorized Transaction" not in result.output
+
+
+def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, transaction_service):
+    """Test that view command shows totals."""
+    from datetime import date
+    from decimal import Decimal
+    
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account["id"],
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Expense",
+    )
+    
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account["id"],
+        date=date(2024, 1, 16),
+        amount=Decimal("100.00"),
+        description="Income",
+    )
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "view",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "TOTAL" in result.output
+    assert "Expenses:" in result.output
+    assert "Income:" in result.output
+    assert "Count:" in result.output
+
+
+def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_account, transaction_service):
+    """Test viewing transactions with relative dates."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+    
+    # Create transaction from yesterday
+    yesterday = date.today() - timedelta(days=1)
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account["id"],
+        date=yesterday,
+        amount=Decimal("-50.00"),
+        description="Yesterday's Transaction",
+    )
+    
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "view",
+            "--start-date",
+            "yesterday",
+            "--end-date",
+            "today",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "transaction" in result.output.lower() or "Yesterday's Transaction" in result.output
 
 
 def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_categories, transaction_service):

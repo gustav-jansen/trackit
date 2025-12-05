@@ -38,7 +38,7 @@ def test_full_workflow(cli_runner, temp_db, fixtures_dir):
     
     assert account_id is not None
     
-    # Step 3: Create CSV format
+    # Step 3: Create CSV format (use account name for easier testing)
     result = cli_runner.invoke(
         cli,
         [
@@ -48,7 +48,7 @@ def test_full_workflow(cli_runner, temp_db, fixtures_dir):
             "create",
             "Test Format",
             "--account",
-            account_id,
+            "Test Bank",
         ],
     )
     assert result.exit_code == 0

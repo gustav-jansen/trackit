@@ -143,8 +143,17 @@ class Database(ABC):
         end_date: Optional[date] = None,
         category_id: Optional[int] = None,
         account_id: Optional[int] = None,
+        uncategorized: bool = False,
     ) -> list[dict[str, Any]]:
-        """List transactions with optional filters."""
+        """List transactions with optional filters.
+        
+        Args:
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            category_id: Optional category ID filter
+            account_id: Optional account ID filter
+            uncategorized: If True, only return transactions without a category
+        """
         pass
 
     @abstractmethod

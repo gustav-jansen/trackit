@@ -126,3 +126,40 @@ def test_format_map_invalid_field(cli_runner, temp_db, sample_account):
     assert result.exit_code == 1
     assert "Invalid db_field_name" in result.output
 
+
+def test_format_create_with_account_name(cli_runner, temp_db, sample_account):
+    """Test creating format with account name instead of ID."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "create",
+            "Test Format 2",
+            "--account",
+            "Test Account",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "Created CSV format 'Test Format 2'" in result.output
+
+
+def test_format_list_with_account_name(cli_runner, temp_db, sample_account, sample_csv_format):
+    """Test listing formats filtered by account name."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "list",
+            "--account",
+            "Test Account",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "Test Format" in result.output
+

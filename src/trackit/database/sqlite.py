@@ -363,6 +363,7 @@ class SQLiteDatabase(Database):
         end_date: Optional[date] = None,
         category_id: Optional[int] = None,
         account_id: Optional[int] = None,
+        uncategorized: bool = False,
     ) -> list[dict[str, Any]]:
         """List transactions with optional filters."""
         session = self._get_session()
@@ -372,7 +373,9 @@ class SQLiteDatabase(Database):
             query = query.filter(Transaction.date >= start_date)
         if end_date is not None:
             query = query.filter(Transaction.date <= end_date)
-        if category_id is not None:
+        if uncategorized:
+            query = query.filter(Transaction.category_id.is_(None))
+        elif category_id is not None:
             query = query.filter(Transaction.category_id == category_id)
         if account_id is not None:
             query = query.filter(Transaction.account_id == account_id)

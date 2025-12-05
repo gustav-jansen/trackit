@@ -9,18 +9,21 @@ from trackit.utils.date_parser import parse_date
 
 
 @click.command("view")
-@click.option("--start-date", help="Start date (YYYY-MM-DD)")
-@click.option("--end-date", help="End date (YYYY-MM-DD)")
+@click.option("--start-date", help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')")
+@click.option("--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')")
 @click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries')")
-@click.option("--account", type=int, help="Account ID")
+@click.option("--account", help="Account name or ID")
+@click.option("--uncategorized", is_flag=True, help="Show only uncategorized transactions")
 @click.option("--verbose", "-v", is_flag=True, help="Show all columns including notes, reference, and unique_id")
 @click.pass_context
 def view_transactions(
-    ctx, start_date: str, end_date: str, category: str, account: int, verbose: bool
+    ctx, start_date: str, end_date: str, category: str, account: str, uncategorized: bool, verbose: bool
 ):
     """View transactions with optional filters.
     
     Use --verbose to show all columns including notes, reference number, and unique_id.
+    Use --uncategorized to show only transactions without a category.
+    Account can be specified by name or ID.
     """
     db = ctx.obj["db"]
     service = TransactionService(db)
@@ -44,9 +47,23 @@ def view_transactions(
             click.echo(f"Error: Invalid end date: {e}", err=True)
             ctx.exit(1)
 
+    # Resolve account name to ID if provided
+    account_id = None
+    if account:
+        try:
+            from trackit.utils.account_resolver import resolve_account
+            account_id = resolve_account(account_service, account)
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
+            ctx.exit(1)
+
+    # Handle uncategorized filter
+    if uncategorized:
+        category = ""  # Empty category path means uncategorized
+
     # Get transactions
     transactions = service.list_transactions(
-        start_date=start, end_date=end, category_path=category, account_id=account
+        start_date=start, end_date=end, category_path=category, account_id=account_id
     )
 
     if not transactions:
@@ -107,6 +124,16 @@ def view_transactions(
                 f"{txn['id']:<6} {str(txn['date']):<12} {amount_str:<12} {account_name:<20} "
                 f"{category_name:<30} {description:<30}"
             )
+    
+    # Show totals
+    if transactions:
+        total_expenses = sum(txn["amount"] for txn in transactions if txn["amount"] < 0)
+        total_income = sum(txn["amount"] for txn in transactions if txn["amount"] > 0)
+        click.echo("-" * 100)
+        click.echo(
+            f"{'TOTAL':<6} {'':<12} Expenses: ${abs(total_expenses):,.2f} | "
+            f"Income: ${total_income:,.2f} | Count: {len(transactions)}"
+        )
 
 
 def register_commands(cli):

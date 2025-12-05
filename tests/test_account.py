@@ -67,3 +67,25 @@ def test_account_create_duplicate(cli_runner, temp_db):
     assert result2.exit_code == 1
     assert "already exists" in result2.output.lower()
 
+
+def test_account_name_resolution(cli_runner, temp_db, sample_account):
+    """Test that account names can be used in commands."""
+    # Test that we can use account name in add command
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "add",
+            "--account",
+            "Test Account",
+            "--date",
+            "2024-01-15",
+            "--amount",
+            "-10.00",
+        ],
+    )
+    
+    assert result.exit_code == 0
+    assert "Created transaction" in result.output
+

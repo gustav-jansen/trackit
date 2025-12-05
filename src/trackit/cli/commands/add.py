@@ -11,8 +11,8 @@ from trackit.utils.amount_parser import parse_amount
 
 
 @click.command("add")
-@click.option("--account", required=True, type=int, help="Account ID")
-@click.option("--date", required=True, help="Transaction date (YYYY-MM-DD)")
+@click.option("--account", required=True, help="Account name or ID")
+@click.option("--date", required=True, help="Transaction date (YYYY-MM-DD or relative like 'today', 'yesterday')")
 @click.option("--amount", required=True, help="Transaction amount (e.g., 123.45 or -123.45)")
 @click.option("--description", help="Transaction description")
 @click.option("--reference", help="Reference number")
@@ -42,10 +42,13 @@ def add_transaction(
     account_service = AccountService(db)
     category_service = CategoryService(db)
 
-    # Verify account exists
-    account_obj = account_service.get_account(account)
-    if account_obj is None:
-        click.echo(f"Error: Account {account} not found", err=True)
+    # Resolve account name to ID
+    try:
+        from trackit.utils.account_resolver import resolve_account
+        account_id = resolve_account(account_service, account)
+        account_obj = account_service.get_account(account_id)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
         ctx.exit(1)
 
     # Parse date
@@ -75,10 +78,10 @@ def add_transaction(
     if unique_id is None:
         # Generate a unique ID based on timestamp and account
         import time
-        unique_id = f"manual_{account}_{int(time.time() * 1000000)}"
+        unique_id = f"manual_{account_id}_{int(time.time() * 1000000)}"
 
     # Check if transaction with this unique_id already exists
-    if db.transaction_exists(account, unique_id):
+    if db.transaction_exists(account_id, unique_id):
         click.echo(
             f"Error: Transaction with unique_id '{unique_id}' already exists for this account",
             err=True,
@@ -89,7 +92,7 @@ def add_transaction(
     try:
         transaction_id = transaction_service.create_transaction(
             unique_id=unique_id,
-            account_id=account,
+            account_id=account_id,
             date=txn_date,
             amount=txn_amount,
             description=description,
