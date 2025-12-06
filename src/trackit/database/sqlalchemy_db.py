@@ -4,6 +4,7 @@ from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from trackit.database.base import Database
 from trackit.database.models import (
@@ -318,51 +319,218 @@ class SQLAlchemyDatabase(Database):
         transactions = query.order_by(Transaction.date.desc(), Transaction.id.desc()).all()
         return [transaction_to_domain(txn) for txn in transactions]
 
+    def _get_top_level_category_id(self, category_id: int) -> Optional[int]:
+        """Get the top-level (root) category ID for a given category.
+
+        Args:
+            category_id: Category ID to find root for
+
+        Returns:
+            Top-level category ID, or None if category doesn't exist
+        """
+        session = self._get_session()
+        current_id = category_id
+
+        while current_id is not None:
+            cat = session.query(Category).filter(Category.id == current_id).first()
+            if cat is None:
+                return None
+            if cat.parent_id is None:
+                return cat.id
+            current_id = cat.parent_id
+
+        return None
+
+    def _get_all_descendant_ids(self, category_id: int) -> set[int]:
+        """Get all descendant category IDs (including the category itself).
+
+        Args:
+            category_id: Category ID to get descendants for
+
+        Returns:
+            Set of category IDs including the category and all its descendants
+        """
+        session = self._get_session()
+        result = {category_id}
+
+        def collect_children(parent_id: int):
+            children = session.query(Category).filter(Category.parent_id == parent_id).all()
+            for child in children:
+                result.add(child.id)
+                collect_children(child.id)
+
+        collect_children(category_id)
+        return result
+
+    def _get_immediate_children_ids(self, category_id: int) -> list[int]:
+        """Get immediate child category IDs.
+
+        Args:
+            category_id: Category ID to get children for
+
+        Returns:
+            List of immediate child category IDs
+        """
+        session = self._get_session()
+        children = session.query(Category).filter(Category.parent_id == category_id).all()
+        return [child.id for child in children]
+
+    def _get_group_id_for_transaction(
+        self, txn: DomainTransaction, category_id: Optional[int], immediate_children_ids: Optional[set[int]]
+    ) -> Optional[int]:
+        """Determine the group ID for a transaction based on the grouping strategy.
+
+        Args:
+            txn: Transaction to get group ID for
+            category_id: If None, group by top-level category. If specified, group by immediate subcategory.
+            immediate_children_ids: Set of immediate child IDs (only used when category_id is specified)
+
+        Returns:
+            Category ID to group this transaction under, or None for uncategorized
+        """
+        if txn.category_id is None:
+            return None
+
+        if category_id is None:
+            # Group by top-level category
+            return self._get_top_level_category_id(txn.category_id)
+
+        # Group by immediate subcategory of the specified category
+        if txn.category_id == category_id:
+            # Transaction is directly in the parent category
+            return category_id
+
+        if immediate_children_ids and txn.category_id in immediate_children_ids:
+            # Transaction is in an immediate subcategory
+            return txn.category_id
+
+        # Transaction is in a deeper descendant - walk up to find immediate child
+        session = self._get_session()
+        current_id = txn.category_id
+        while current_id is not None and current_id != category_id:
+            cat = session.query(Category).filter(Category.id == current_id).first()
+            if cat is None:
+                break
+            if cat.parent_id == category_id:
+                # Found the immediate child
+                return current_id
+            current_id = cat.parent_id
+
+        # If we couldn't find an immediate child, group under parent
+        return category_id
+
+    def _aggregate_transactions_by_group(
+        self, transactions: list[Transaction], category_id: Optional[int]
+    ) -> dict[Optional[int], dict[str, Any]]:
+        """Aggregate transactions by their group ID.
+
+        Args:
+            transactions: List of transactions to aggregate
+            category_id: Category ID for grouping strategy (None for top-level, specified for subcategories)
+
+        Returns:
+            Dictionary mapping group IDs to aggregated data (expenses, income, count)
+        """
+        from collections import defaultdict
+
+        # Get immediate children if grouping by subcategories
+        immediate_children_ids = None
+        if category_id is not None:
+            immediate_children_ids = set(self._get_immediate_children_ids(category_id))
+
+        summary_dict: dict[Optional[int], dict[str, Any]] = defaultdict(
+            lambda: {"expenses": 0.0, "income": 0.0, "count": 0}
+        )
+
+        for txn in transactions:
+            group_id = self._get_group_id_for_transaction(txn, category_id, immediate_children_ids)
+            summary_dict[group_id]["expenses"] += float(min(txn.amount, 0))
+            summary_dict[group_id]["income"] += float(max(txn.amount, 0))
+            summary_dict[group_id]["count"] += 1
+
+        return summary_dict
+
+    def _convert_summary_to_results(
+        self, summary_dict: dict[Optional[int], dict[str, Any]], category_id: Optional[int]
+    ) -> list[dict[str, Any]]:
+        """Convert aggregated summary dictionary to result list with category names.
+
+        Args:
+            summary_dict: Dictionary mapping group IDs to aggregated data
+            category_id: Category ID (used to get parent name when grouping by subcategories)
+
+        Returns:
+            List of summary result dictionaries
+        """
+        session = self._get_session()
+
+        # Get parent category name if grouping by subcategories
+        parent_name = None
+        if category_id is not None:
+            parent_cat = session.query(Category).filter(Category.id == category_id).first()
+            parent_name = parent_cat.name if parent_cat else "Unknown"
+
+        results = []
+        for group_id, data in summary_dict.items():
+            if group_id is None:
+                category_name = "Uncategorized"
+            elif category_id is not None and group_id == category_id:
+                category_name = parent_name or "Unknown"
+            else:
+                cat = session.query(Category).filter(Category.id == group_id).first()
+                category_name = cat.name if cat else ("Uncategorized" if category_id is None else "Unknown")
+
+            results.append({
+                "category_id": group_id,
+                "category_name": category_name,
+                "expenses": data["expenses"],
+                "income": data["income"],
+                "count": data["count"],
+            })
+
+        return results
+
     def get_category_summary(
         self,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         category_id: Optional[int] = None,
+        include_transfers: bool = False,
     ) -> list[dict[str, Any]]:
-        """Get summary of expenses by category."""
+        """Get summary of expenses by category.
+
+        When category_id is None, groups by top-level category.
+        When category_id is specified, includes all descendants and groups by immediate subcategories.
+        """
         session = self._get_session()
-        from sqlalchemy import func, case
 
-        # Build base query
-        query = session.query(
-            Transaction.category_id,
-            Category.name.label("category_name"),
-            func.sum(
-                case((Transaction.amount < 0, Transaction.amount), else_=0)
-            ).label("expenses"),
-            func.sum(
-                case((Transaction.amount > 0, Transaction.amount), else_=0)
-            ).label("income"),
-            func.count(Transaction.id).label("count"),
-        ).join(Category, Transaction.category_id == Category.id, isouter=True)
+        # Build base query for transactions
+        query = session.query(Transaction)
 
-        # Apply filters
+        # Apply date filters
         if start_date is not None:
             query = query.filter(Transaction.date >= start_date)
         if end_date is not None:
             query = query.filter(Transaction.date <= end_date)
+
+        # Apply category filter if specified
         if category_id is not None:
-            # Include the category and all its descendants
-            # For simplicity, we'll filter by exact category_id
-            # A more sophisticated implementation would traverse the tree
-            query = query.filter(Transaction.category_id == category_id)
+            # Include all descendants of the specified category
+            descendant_ids = self._get_all_descendant_ids(category_id)
+            query = query.filter(Transaction.category_id.in_(descendant_ids))
 
-        query = query.group_by(Transaction.category_id, Category.name)
-        results = query.all()
+        # Filter out Transfer category transactions if not including transfers
+        if not include_transfers:
+            transfer_category = self.get_category_by_path("Transfer")
+            if transfer_category is not None:
+                transfer_ids = self._get_all_descendant_ids(transfer_category.id)
+                # Exclude transfer categories, but include uncategorized (None) transactions
+                query = query.filter(
+                    or_(Transaction.category_id.is_(None), ~Transaction.category_id.in_(transfer_ids))
+                )
 
-        return [
-            {
-                "category_id": r.category_id,
-                "category_name": r.category_name or "Uncategorized",
-                "expenses": float(r.expenses or 0),
-                "income": float(r.income or 0),
-                "count": r.count,
-            }
-            for r in results
-        ]
+        # Get transactions and aggregate
+        transactions = query.all()
+        summary_dict = self._aggregate_transactions_by_group(transactions, category_id)
+        return self._convert_summary_to_results(summary_dict, category_id)
 

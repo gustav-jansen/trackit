@@ -175,6 +175,7 @@ class Database(ABC):
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         category_id: Optional[int] = None,
+        include_transfers: bool = False,
     ) -> list[dict[str, Any]]:
         """Get summary of expenses by category.
 
