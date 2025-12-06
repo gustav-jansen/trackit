@@ -1,7 +1,7 @@
 """Main CLI entry point."""
 
 import click
-from trackit.database.sqlite import SQLiteDatabase
+from trackit.database.factories import create_sqlite_database
 
 # Import and register all commands at module level
 from trackit.cli.commands import (
@@ -36,7 +36,7 @@ def cli(ctx, db_path: str | None):
     # Initialize database connection only when actually running a command
     # (not when showing help)
     if ctx.invoked_subcommand is not None:
-        db = SQLiteDatabase(database_path=db_path)
+        db = create_sqlite_database(database_path=db_path)
         db.connect()
         db.initialize_schema()
         ctx.obj["db"] = db

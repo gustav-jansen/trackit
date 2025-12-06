@@ -4,7 +4,7 @@ import pytest
 from datetime import date, datetime, UTC
 from decimal import Decimal
 
-from trackit.database.sqlite import SQLiteDatabase
+from trackit.database.factories import create_sqlite_database
 from trackit.domain import entities
 
 

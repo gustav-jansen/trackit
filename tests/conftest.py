@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import pytest
 
-from trackit.database.sqlite import SQLiteDatabase
+from trackit.database.factories import create_sqlite_database
 from trackit.domain.account import AccountService
 from trackit.domain.csv_format import CSVFormatService
 from trackit.domain.category import CategoryService
@@ -20,7 +20,9 @@ def temp_db():
     os.close(fd)
     
     # Create database
-    db = SQLiteDatabase(database_path=db_path)
+    db = create_sqlite_database(database_path=db_path)
+    # Store the path for tests that need it
+    db.database_path = db_path
     db.connect()
     db.initialize_schema()
     
