@@ -1,7 +1,5 @@
-"""SQLite database implementation."""
+"""Generic SQLAlchemy database implementation."""
 
-import os
-from pathlib import Path
 from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
@@ -32,29 +30,18 @@ from trackit.domain.entities import (
 )
 
 
-class SQLiteDatabase(Database):
-    """SQLite implementation of Database interface."""
+class SQLAlchemyDatabase(Database):
+    """SQLAlchemy-based implementation of Database interface."""
 
-    def __init__(self, database_path: Optional[str] = None):
-        """Initialize SQLite database.
+    def __init__(self, database_url: str):
+        """Initialize SQLAlchemy database.
 
         Args:
-            database_path: Path to SQLite database file. If None, checks TRACKIT_DB_PATH
-                environment variable, then defaults to ~/.trackit/trackit.db
+            database_url: SQLAlchemy database URL (e.g., 'sqlite:///path/to.db',
+                'postgresql://user:pass@host/db', etc.)
         """
-        if database_path is None:
-            # Check environment variable
-            database_path = os.environ.get("TRACKIT_DB_PATH")
-
-        if database_path is None:
-            # Default to ~/.trackit/trackit.db
-            home = Path.home()
-            db_dir = home / ".trackit"
-            db_dir.mkdir(exist_ok=True)
-            database_path = str(db_dir / "trackit.db")
-
-        self.database_path = database_path
-        self.session_factory = create_session_factory(f"sqlite:///{database_path}")
+        self.database_url = database_url
+        self.session_factory = create_session_factory(database_url)
         self._session: Optional[Session] = None
 
     def _get_session(self) -> Session:
