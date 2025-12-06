@@ -247,13 +247,36 @@ trackit/
 
 ## Architecture
 
-The application follows a layered architecture:
+The application follows a layered architecture designed for maintainability and future extensibility:
 
-- **Database Layer**: Abstract interface with SQLite implementation (easily switchable)
-- **Domain Layer**: Business logic separated from UI
-- **CLI Layer**: Command-line interface (extendable to web UI later)
+### Layers
 
-This separation makes it easy to add a web interface or other UIs in the future without changing the core business logic.
+1. **CLI Layer** (`cli/commands/*`): Command-line interface and presentation logic
+2. **Domain Services** (`domain/*.py`): Business logic layer that operates on domain models
+3. **Domain Models** (`domain/entities.py`): Immutable data classes representing business concepts
+4. **Database Interface** (`database/base.py`): Abstract repository interface
+5. **Database Implementation** (`database/sqlite.py`): SQLite-specific implementation
+6. **Mappers** (`database/mappers.py`): Conversion layer between domain models and database models
+7. **Database Models** (`database/models.py`): SQLAlchemy ORM models (database schema)
+
+### Key Design Principles
+
+- **Domain Models**: Pure, immutable data classes independent of database schema
+- **Repository Pattern**: Database operations abstracted through a clean interface
+- **Mapper Layer**: Isolates conversion logic between domain and database models
+- **Separation of Concerns**: Business logic is completely isolated from database implementation
+
+### Benefits
+
+- **Future-Proof**: The architecture is prepared for a future switch to double-entry bookkeeping. Only the database models and mappers need to change, while business logic and UI remain stable.
+- **Type Safety**: Domain models provide strong typing and IDE support
+- **Testability**: Domain models can be easily mocked and tested independently
+- **Maintainability**: Clear boundaries between layers make the codebase easier to understand and modify
+
+This separation makes it easy to:
+- Add a web interface or other UIs without changing business logic
+- Switch database backends (SQLite → PostgreSQL, etc.)
+- Evolve the data model (single-entry → double-entry bookkeeping) with minimal impact on business logic
 
 ## License
 

@@ -92,7 +92,7 @@ def sample_categories(category_service):
 def sample_csv_format(csv_format_service, sample_account):
     """Create a sample CSV format with mappings."""
     format_id = csv_format_service.create_format(
-        name="Test Format", account_id=sample_account["id"]
+        name="Test Format", account_id=sample_account.id
     )
     
     # Add required mappings

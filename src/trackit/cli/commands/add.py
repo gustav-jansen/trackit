@@ -72,7 +72,7 @@ def add_transaction(
         if category_obj is None:
             click.echo(f"Error: Category '{category}' not found", err=True)
             ctx.exit(1)
-        category_id = category_obj["id"]
+        category_id = category_obj.id
 
     # Generate unique_id if not provided
     if unique_id is None:
@@ -101,7 +101,7 @@ def add_transaction(
             notes=notes,
         )
         click.echo(f"Created transaction {transaction_id}")
-        click.echo(f"  Account: {account_obj['name']}")
+        click.echo(f"  Account: {account_obj.name}")
         click.echo(f"  Date: {txn_date}")
         click.echo(f"  Amount: ${txn_amount:,.2f}")
         if description:

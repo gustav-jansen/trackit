@@ -1,9 +1,18 @@
 """Abstract database interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
-from datetime import date, datetime
+from typing import Optional, Any
+from datetime import date
 from decimal import Decimal
+
+# Import entities directly to avoid circular import through domain/__init__.py
+from trackit.domain.entities import (
+    Account,
+    Category,
+    Transaction,
+    CSVFormat,
+    CSVColumnMapping,
+)
 
 
 class Database(ABC):
@@ -31,12 +40,12 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def get_account(self, account_id: int) -> Optional[dict[str, Any]]:
+    def get_account(self, account_id: int) -> Optional[Account]:
         """Get account by ID."""
         pass
 
     @abstractmethod
-    def list_accounts(self) -> list[dict[str, Any]]:
+    def list_accounts(self) -> list[Account]:
         """List all accounts."""
         pass
 
@@ -47,17 +56,17 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def get_csv_format(self, format_id: int) -> Optional[dict[str, Any]]:
+    def get_csv_format(self, format_id: int) -> Optional[CSVFormat]:
         """Get CSV format by ID."""
         pass
 
     @abstractmethod
-    def get_csv_format_by_name(self, name: str) -> Optional[dict[str, Any]]:
+    def get_csv_format_by_name(self, name: str) -> Optional[CSVFormat]:
         """Get CSV format by name."""
         pass
 
     @abstractmethod
-    def list_csv_formats(self, account_id: Optional[int] = None) -> list[dict[str, Any]]:
+    def list_csv_formats(self, account_id: Optional[int] = None) -> list[CSVFormat]:
         """List CSV formats, optionally filtered by account."""
         pass
 
@@ -70,7 +79,7 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def get_column_mappings(self, format_id: int) -> list[dict[str, Any]]:
+    def get_column_mappings(self, format_id: int) -> list[CSVColumnMapping]:
         """Get all column mappings for a format."""
         pass
 
@@ -81,23 +90,27 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def get_category(self, category_id: int) -> Optional[dict[str, Any]]:
+    def get_category(self, category_id: int) -> Optional[Category]:
         """Get category by ID."""
         pass
 
     @abstractmethod
-    def get_category_by_path(self, path: str) -> Optional[dict[str, Any]]:
+    def get_category_by_path(self, path: str) -> Optional[Category]:
         """Get category by path (e.g., 'Food & Dining > Groceries')."""
         pass
 
     @abstractmethod
-    def list_categories(self, parent_id: Optional[int] = None) -> list[dict[str, Any]]:
+    def list_categories(self, parent_id: Optional[int] = None) -> list[Category]:
         """List categories, optionally filtered by parent."""
         pass
 
     @abstractmethod
     def get_category_tree(self) -> list[dict[str, Any]]:
-        """Get full category tree with hierarchy."""
+        """Get full category tree with hierarchy.
+
+        Returns a list of dictionaries with category data and nested 'children' lists.
+        This structure is used for hierarchical display and is kept as dict for convenience.
+        """
         pass
 
     # Transaction operations
@@ -117,7 +130,7 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def get_transaction(self, transaction_id: int) -> Optional[dict[str, Any]]:
+    def get_transaction(self, transaction_id: int) -> Optional[Transaction]:
         """Get transaction by ID."""
         pass
 
@@ -144,9 +157,9 @@ class Database(ABC):
         category_id: Optional[int] = None,
         account_id: Optional[int] = None,
         uncategorized: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Transaction]:
         """List transactions with optional filters.
-        
+
         Args:
             start_date: Optional start date filter
             end_date: Optional end date filter
@@ -163,6 +176,10 @@ class Database(ABC):
         end_date: Optional[date] = None,
         category_id: Optional[int] = None,
     ) -> list[dict[str, Any]]:
-        """Get summary of expenses by category."""
+        """Get summary of expenses by category.
+
+        Returns a list of dictionaries with summary data (category_id, category_name,
+        expenses, income, count). This structure is kept as dict for aggregation results.
+        """
         pass
 

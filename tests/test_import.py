@@ -34,7 +34,7 @@ def test_import_duplicate_detection(cli_runner, temp_db, sample_account, sample_
     # Create existing transaction
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Existing",

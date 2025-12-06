@@ -2,6 +2,7 @@
 
 from typing import Optional
 from trackit.database.base import Database
+from trackit.domain.entities import Account as AccountEntity
 
 
 class AccountService:
@@ -31,27 +32,27 @@ class AccountService:
         # Check if account with same name exists
         accounts = self.db.list_accounts()
         for acc in accounts:
-            if acc["name"] == name:
+            if acc.name == name:
                 raise ValueError(f"Account with name '{name}' already exists")
 
         return self.db.create_account(name=name, bank_name=bank_name)
 
-    def get_account(self, account_id: int) -> Optional[dict]:
+    def get_account(self, account_id: int) -> Optional[AccountEntity]:
         """Get account by ID.
 
         Args:
             account_id: Account ID
 
         Returns:
-            Account dict or None if not found
+            Account entity or None if not found
         """
         return self.db.get_account(account_id)
 
-    def list_accounts(self) -> list[dict]:
+    def list_accounts(self) -> list[AccountEntity]:
         """List all accounts.
 
         Returns:
-            List of account dicts
+            List of account entities
         """
         return self.db.list_accounts()
 

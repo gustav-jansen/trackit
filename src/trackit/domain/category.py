@@ -2,6 +2,7 @@
 
 from typing import Optional
 from trackit.database.base import Database
+from trackit.domain.entities import Category as CategoryEntity
 
 
 class CategoryService:
@@ -33,40 +34,40 @@ class CategoryService:
             parent = self.db.get_category_by_path(parent_path)
             if parent is None:
                 raise ValueError(f"Parent category '{parent_path}' not found")
-            parent_id = parent["id"]
+            parent_id = parent.id
 
         return self.db.create_category(name=name, parent_id=parent_id)
 
-    def get_category(self, category_id: int) -> Optional[dict]:
+    def get_category(self, category_id: int) -> Optional[CategoryEntity]:
         """Get category by ID.
 
         Args:
             category_id: Category ID
 
         Returns:
-            Category dict or None if not found
+            Category entity or None if not found
         """
         return self.db.get_category(category_id)
 
-    def get_category_by_path(self, path: str) -> Optional[dict]:
+    def get_category_by_path(self, path: str) -> Optional[CategoryEntity]:
         """Get category by path.
 
         Args:
             path: Category path (e.g., "Food & Dining > Groceries")
 
         Returns:
-            Category dict or None if not found
+            Category entity or None if not found
         """
         return self.db.get_category_by_path(path)
 
-    def list_categories(self, parent_id: Optional[int] = None) -> list[dict]:
+    def list_categories(self, parent_id: Optional[int] = None) -> list[CategoryEntity]:
         """List categories.
 
         Args:
             parent_id: Optional parent category ID to filter by
 
         Returns:
-            List of category dicts
+            List of category entities
         """
         return self.db.list_categories(parent_id=parent_id)
 
@@ -74,7 +75,7 @@ class CategoryService:
         """Get full category tree.
 
         Returns:
-            List of root categories with nested children
+            List of root categories with nested children (as dicts for hierarchical structure)
         """
         return self.db.get_category_tree()
 
@@ -91,15 +92,15 @@ class CategoryService:
         if cat is None:
             return ""
 
-        path_parts = [cat["name"]]
-        current_parent_id = cat["parent_id"]
+        path_parts = [cat.name]
+        current_parent_id = cat.parent_id
 
         while current_parent_id is not None:
             parent = self.get_category(current_parent_id)
             if parent is None:
                 break
-            path_parts.append(parent["name"])
-            current_parent_id = parent["parent_id"]
+            path_parts.append(parent.name)
+            current_parent_id = parent.parent_id
 
         return " > ".join(reversed(path_parts))
 

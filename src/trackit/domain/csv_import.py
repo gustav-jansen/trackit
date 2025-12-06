@@ -51,15 +51,15 @@ class CSVImportService:
             raise ValueError(f"CSV format '{format_name}' not found")
 
         # Validate format
-        is_valid, missing = self.format_service.validate_format(fmt["id"])
+        is_valid, missing = self.format_service.validate_format(fmt.id)
         if not is_valid:
             raise ValueError(
                 f"CSV format '{format_name}' is missing required mappings: {', '.join(missing)}"
             )
 
         # Get mappings
-        mappings = self.format_service.get_mappings(fmt["id"])
-        column_map = {m["csv_column_name"]: m["db_field_name"] for m in mappings}
+        mappings = self.format_service.get_mappings(fmt.id)
+        column_map = {m.csv_column_name: m.db_field_name for m in mappings}
 
         # Read CSV file
         csv_path = Path(csv_file_path)
@@ -135,7 +135,7 @@ class CSVImportService:
                         continue
 
                     # Use the account from the format (account_name is not read from CSV)
-                    account_id = fmt["account_id"]
+                    account_id = fmt.account_id
                     
                     # Verify account still exists
                     account = self.account_service.get_account(account_id)

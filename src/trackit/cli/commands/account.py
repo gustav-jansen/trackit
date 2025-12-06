@@ -55,7 +55,7 @@ def list_accounts(ctx):
     click.echo("\nAccounts:")
     click.echo("-" * 60)
     for acc in accounts:
-        click.echo(f"ID: {acc['id']:3d} | {acc['name']:20s} | Bank: {acc['bank_name']}")
+        click.echo(f"ID: {acc.id:3d} | {acc.name:20s} | Bank: {acc.bank_name}")
 
 
 def register_commands(cli):

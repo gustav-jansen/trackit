@@ -2,8 +2,8 @@
 
 import os
 from pathlib import Path
-from typing import Any, Optional
-from datetime import date, datetime
+from typing import Optional, Any
+from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,20 @@ from trackit.database.models import (
     Category,
     Transaction,
     create_session_factory,
+)
+from trackit.database.mappers import (
+    account_to_domain,
+    category_to_domain,
+    transaction_to_domain,
+    csv_format_to_domain,
+    csv_column_mapping_to_domain,
+)
+from trackit.domain.entities import (
+    Account as DomainAccount,
+    Category as DomainCategory,
+    Transaction as DomainTransaction,
+    CSVFormat as DomainCSVFormat,
+    CSVColumnMapping as DomainCSVColumnMapping,
 )
 
 
@@ -74,32 +88,19 @@ class SQLiteDatabase(Database):
         session.commit()
         return account.id
 
-    def get_account(self, account_id: int) -> Optional[dict[str, Any]]:
+    def get_account(self, account_id: int) -> Optional[DomainAccount]:
         """Get account by ID."""
         session = self._get_session()
         account = session.query(Account).filter(Account.id == account_id).first()
         if account is None:
             return None
-        return {
-            "id": account.id,
-            "name": account.name,
-            "bank_name": account.bank_name,
-            "created_at": account.created_at,
-        }
+        return account_to_domain(account)
 
-    def list_accounts(self) -> list[dict[str, Any]]:
+    def list_accounts(self) -> list[DomainAccount]:
         """List all accounts."""
         session = self._get_session()
         accounts = session.query(Account).order_by(Account.name).all()
-        return [
-            {
-                "id": acc.id,
-                "name": acc.name,
-                "bank_name": acc.bank_name,
-                "created_at": acc.created_at,
-            }
-            for acc in accounts
-        ]
+        return [account_to_domain(acc) for acc in accounts]
 
     # CSV Format operations
     def create_csv_format(self, name: str, account_id: int) -> int:
@@ -110,48 +111,30 @@ class SQLiteDatabase(Database):
         session.commit()
         return csv_format.id
 
-    def get_csv_format(self, format_id: int) -> Optional[dict[str, Any]]:
+    def get_csv_format(self, format_id: int) -> Optional[DomainCSVFormat]:
         """Get CSV format by ID."""
         session = self._get_session()
         fmt = session.query(CSVFormat).filter(CSVFormat.id == format_id).first()
         if fmt is None:
             return None
-        return {
-            "id": fmt.id,
-            "name": fmt.name,
-            "account_id": fmt.account_id,
-            "created_at": fmt.created_at,
-        }
+        return csv_format_to_domain(fmt)
 
-    def get_csv_format_by_name(self, name: str) -> Optional[dict[str, Any]]:
+    def get_csv_format_by_name(self, name: str) -> Optional[DomainCSVFormat]:
         """Get CSV format by name."""
         session = self._get_session()
         fmt = session.query(CSVFormat).filter(CSVFormat.name == name).first()
         if fmt is None:
             return None
-        return {
-            "id": fmt.id,
-            "name": fmt.name,
-            "account_id": fmt.account_id,
-            "created_at": fmt.created_at,
-        }
+        return csv_format_to_domain(fmt)
 
-    def list_csv_formats(self, account_id: Optional[int] = None) -> list[dict[str, Any]]:
+    def list_csv_formats(self, account_id: Optional[int] = None) -> list[DomainCSVFormat]:
         """List CSV formats, optionally filtered by account."""
         session = self._get_session()
         query = session.query(CSVFormat)
         if account_id is not None:
             query = query.filter(CSVFormat.account_id == account_id)
         formats = query.order_by(CSVFormat.name).all()
-        return [
-            {
-                "id": fmt.id,
-                "name": fmt.name,
-                "account_id": fmt.account_id,
-                "created_at": fmt.created_at,
-            }
-            for fmt in formats
-        ]
+        return [csv_format_to_domain(fmt) for fmt in formats]
 
     # CSV Column Mapping operations
     def add_column_mapping(
@@ -169,7 +152,7 @@ class SQLiteDatabase(Database):
         session.commit()
         return mapping.id
 
-    def get_column_mappings(self, format_id: int) -> list[dict[str, Any]]:
+    def get_column_mappings(self, format_id: int) -> list[DomainCSVColumnMapping]:
         """Get all column mappings for a format."""
         session = self._get_session()
         mappings = (
@@ -178,16 +161,7 @@ class SQLiteDatabase(Database):
             .order_by(CSVColumnMapping.db_field_name)
             .all()
         )
-        return [
-            {
-                "id": m.id,
-                "format_id": m.format_id,
-                "csv_column_name": m.csv_column_name,
-                "db_field_name": m.db_field_name,
-                "is_required": m.is_required,
-            }
-            for m in mappings
-        ]
+        return [csv_column_mapping_to_domain(m) for m in mappings]
 
     # Category operations
     def create_category(self, name: str, parent_id: Optional[int] = None) -> int:
@@ -198,20 +172,15 @@ class SQLiteDatabase(Database):
         session.commit()
         return category.id
 
-    def get_category(self, category_id: int) -> Optional[dict[str, Any]]:
+    def get_category(self, category_id: int) -> Optional[DomainCategory]:
         """Get category by ID."""
         session = self._get_session()
         cat = session.query(Category).filter(Category.id == category_id).first()
         if cat is None:
             return None
-        return {
-            "id": cat.id,
-            "name": cat.name,
-            "parent_id": cat.parent_id,
-            "created_at": cat.created_at,
-        }
+        return category_to_domain(cat)
 
-    def get_category_by_path(self, path: str) -> Optional[dict[str, Any]]:
+    def get_category_by_path(self, path: str) -> Optional[DomainCategory]:
         """Get category by path (e.g., 'Food & Dining > Groceries')."""
         parts = [p.strip() for p in path.split(">")]
         session = self._get_session()
@@ -233,14 +202,11 @@ class SQLiteDatabase(Database):
             return None
 
         cat = session.query(Category).filter(Category.id == current_parent_id).first()
-        return {
-            "id": cat.id,
-            "name": cat.name,
-            "parent_id": cat.parent_id,
-            "created_at": cat.created_at,
-        }
+        if cat is None:
+            return None
+        return category_to_domain(cat)
 
-    def list_categories(self, parent_id: Optional[int] = None) -> list[dict[str, Any]]:
+    def list_categories(self, parent_id: Optional[int] = None) -> list[DomainCategory]:
         """List categories, optionally filtered by parent."""
         session = self._get_session()
         query = session.query(Category)
@@ -249,15 +215,7 @@ class SQLiteDatabase(Database):
         else:
             query = query.filter(Category.parent_id == parent_id)
         categories = query.order_by(Category.name).all()
-        return [
-            {
-                "id": cat.id,
-                "name": cat.name,
-                "parent_id": cat.parent_id,
-                "created_at": cat.created_at,
-            }
-            for cat in categories
-        ]
+        return [category_to_domain(cat) for cat in categories]
 
     def get_category_tree(self) -> list[dict[str, Any]]:
         """Get full category tree with hierarchy."""
@@ -269,12 +227,13 @@ class SQLiteDatabase(Database):
             for cat in categories:
                 if cat.parent_id == parent_id:
                     children = build_tree(categories, cat.id)
+                    cat_domain = category_to_domain(cat)
                     result.append(
                         {
-                            "id": cat.id,
-                            "name": cat.name,
-                            "parent_id": cat.parent_id,
-                            "created_at": cat.created_at,
+                            "id": cat_domain.id,
+                            "name": cat_domain.name,
+                            "parent_id": cat_domain.parent_id,
+                            "created_at": cat_domain.created_at,
                             "children": children,
                         }
                     )
@@ -310,24 +269,13 @@ class SQLiteDatabase(Database):
         session.commit()
         return transaction.id
 
-    def get_transaction(self, transaction_id: int) -> Optional[dict[str, Any]]:
+    def get_transaction(self, transaction_id: int) -> Optional[DomainTransaction]:
         """Get transaction by ID."""
         session = self._get_session()
         txn = session.query(Transaction).filter(Transaction.id == transaction_id).first()
         if txn is None:
             return None
-        return {
-            "id": txn.id,
-            "unique_id": txn.unique_id,
-            "account_id": txn.account_id,
-            "date": txn.date,
-            "amount": float(txn.amount),
-            "description": txn.description,
-            "reference_number": txn.reference_number,
-            "category_id": txn.category_id,
-            "notes": txn.notes,
-            "imported_at": txn.imported_at,
-        }
+        return transaction_to_domain(txn)
 
     def transaction_exists(self, account_id: int, unique_id: str) -> bool:
         """Check if a transaction with given unique_id exists for account."""
@@ -364,7 +312,7 @@ class SQLiteDatabase(Database):
         category_id: Optional[int] = None,
         account_id: Optional[int] = None,
         uncategorized: bool = False,
-    ) -> list[dict[str, Any]]:
+    ) -> list[DomainTransaction]:
         """List transactions with optional filters."""
         session = self._get_session()
         query = session.query(Transaction)
@@ -381,21 +329,7 @@ class SQLiteDatabase(Database):
             query = query.filter(Transaction.account_id == account_id)
 
         transactions = query.order_by(Transaction.date.desc(), Transaction.id.desc()).all()
-        return [
-            {
-                "id": txn.id,
-                "unique_id": txn.unique_id,
-                "account_id": txn.account_id,
-                "date": txn.date,
-                "amount": float(txn.amount),
-                "description": txn.description,
-                "reference_number": txn.reference_number,
-                "category_id": txn.category_id,
-                "notes": txn.notes,
-                "imported_at": txn.imported_at,
-            }
-            for txn in transactions
-        ]
+        return [transaction_to_domain(txn) for txn in transactions]
 
     def get_category_summary(
         self,

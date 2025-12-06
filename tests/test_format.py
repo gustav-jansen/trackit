@@ -16,7 +16,7 @@ def test_format_create(cli_runner, temp_db, sample_account):
             "create",
             "Test Format",
             "--account",
-            str(sample_account["id"]),
+            str(sample_account.id),
         ],
     )
     
@@ -37,7 +37,7 @@ def test_format_map(cli_runner, temp_db, sample_account):
             "create",
             "Test Format",
             "--account",
-            str(sample_account["id"]),
+            str(sample_account.id),
         ],
     )
     assert result1.exit_code == 0
@@ -105,7 +105,7 @@ def test_format_map_invalid_field(cli_runner, temp_db, sample_account):
             "create",
             "Test Format",
             "--account",
-            str(sample_account["id"]),
+            str(sample_account.id),
         ],
     )
     
