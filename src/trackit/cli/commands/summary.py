@@ -9,8 +9,9 @@ from trackit.utils.date_parser import parse_date
 @click.option("--start-date", help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')")
 @click.option("--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')")
 @click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries')")
+@click.option("--include-transfers", is_flag=True, help="Include transactions with Transfer category")
 @click.pass_context
-def summary(ctx, start_date: str, end_date: str, category: str):
+def summary(ctx, start_date: str, end_date: str, category: str, include_transfers: bool):
     """Show category summary."""
     db = ctx.obj["db"]
     service = TransactionService(db)
@@ -34,7 +35,7 @@ def summary(ctx, start_date: str, end_date: str, category: str):
 
     # Get summary
     summaries = service.get_summary(
-        start_date=start, end_date=end, category_path=category
+        start_date=start, end_date=end, category_path=category, include_transfers=include_transfers
     )
 
     if not summaries:

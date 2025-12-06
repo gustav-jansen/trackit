@@ -169,6 +169,7 @@ class TransactionService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         category_path: Optional[str] = None,
+        include_transfers: bool = False,
     ) -> list[dict]:
         """Get category summary.
 
@@ -176,6 +177,7 @@ class TransactionService:
             start_date: Optional start date filter
             end_date: Optional end date filter
             category_path: Optional category path filter
+            include_transfers: If True, include transactions with Transfer category
 
         Returns:
             List of summary dicts
@@ -187,6 +189,6 @@ class TransactionService:
                 category_id = category.id
 
         return self.db.get_category_summary(
-            start_date=start_date, end_date=end_date, category_id=category_id
+            start_date=start_date, end_date=end_date, category_id=category_id, include_transfers=include_transfers
         )
 

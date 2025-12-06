@@ -4,6 +4,7 @@ from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from trackit.database.base import Database
 from trackit.database.models import (
@@ -494,6 +495,7 @@ class SQLAlchemyDatabase(Database):
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         category_id: Optional[int] = None,
+        include_transfers: bool = False,
     ) -> list[dict[str, Any]]:
         """Get summary of expenses by category.
 
@@ -516,6 +518,16 @@ class SQLAlchemyDatabase(Database):
             # Include all descendants of the specified category
             descendant_ids = self._get_all_descendant_ids(category_id)
             query = query.filter(Transaction.category_id.in_(descendant_ids))
+
+        # Filter out Transfer category transactions if not including transfers
+        if not include_transfers:
+            transfer_category = self.get_category_by_path("Transfer")
+            if transfer_category is not None:
+                transfer_ids = self._get_all_descendant_ids(transfer_category.id)
+                # Exclude transfer categories, but include uncategorized (None) transactions
+                query = query.filter(
+                    or_(Transaction.category_id.is_(None), ~Transaction.category_id.in_(transfer_ids))
+                )
 
         # Get transactions and aggregate
         transactions = query.all()

@@ -174,3 +174,145 @@ def test_summary_with_subcategory_filter(cli_runner, temp_db, sample_account, sa
     assert "Groceries" in result.output
     assert "50.00" in result.output
 
+
+def test_summary_excludes_transfers_by_default(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+    """Test that Transfer category transactions are excluded by default."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create Transfer category and subcategory
+    transfer_id = category_service.create_category(name="Transfer", parent_path=None)
+    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer")
+
+    # Add a regular transaction
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Add a transfer transaction
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 16),
+        amount=Decimal("-100.00"),
+        description="Transfer to savings",
+        category_id=transfer_sub_id,
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    # Should show Food & Dining
+    assert "Food & Dining" in result.output
+    assert "50.00" in result.output
+    # Should NOT show Transfer
+    assert "Transfer" not in result.output
+    assert "100.00" not in result.output
+
+
+def test_summary_includes_transfers_with_flag(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+    """Test that Transfer category transactions are included with --include-transfers flag."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create Transfer category and subcategory
+    transfer_id = category_service.create_category(name="Transfer", parent_path=None)
+    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer")
+
+    # Add a regular transaction
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Add a transfer transaction
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 16),
+        amount=Decimal("-100.00"),
+        description="Transfer to savings",
+        category_id=transfer_sub_id,
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary", "--include-transfers"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    # Should show Food & Dining
+    assert "Food & Dining" in result.output
+    assert "50.00" in result.output
+    # Should show Transfer
+    assert "Transfer" in result.output
+    assert "100.00" in result.output
+
+
+def test_summary_excludes_transfers_with_subcategories(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+    """Test that Transfer category and all its subcategories are excluded by default."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create Transfer category with multiple subcategories
+    transfer_id = category_service.create_category(name="Transfer", parent_path=None)
+    transfer_sub1_id = category_service.create_category(name="Between Accounts", parent_path="Transfer")
+    transfer_sub2_id = category_service.create_category(name="To Investment", parent_path="Transfer")
+
+    # Add regular transactions
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Add transfer transactions in different subcategories
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 16),
+        amount=Decimal("-100.00"),
+        description="Transfer to savings",
+        category_id=transfer_sub1_id,
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN003",
+        account_id=sample_account.id,
+        date=date(2024, 1, 17),
+        amount=Decimal("-200.00"),
+        description="Transfer to investment",
+        category_id=transfer_sub2_id,
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    # Should show Food & Dining
+    assert "Food & Dining" in result.output
+    assert "50.00" in result.output
+    # Should NOT show Transfer or any of its subcategories
+    assert "Transfer" not in result.output
+    assert "Between Accounts" not in result.output
+    assert "To Investment" not in result.output
+    assert "100.00" not in result.output
+    assert "200.00" not in result.output
+
