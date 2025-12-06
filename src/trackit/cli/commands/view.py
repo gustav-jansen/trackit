@@ -71,7 +71,7 @@ def view_transactions(
         return
 
     # Get account names for display
-    accounts = {acc["id"]: acc["name"] for acc in account_service.list_accounts()}
+    accounts = {acc.id: acc.name for acc in account_service.list_accounts()}
 
     if verbose:
         # Verbose mode: show all columns in a detailed format
@@ -79,28 +79,28 @@ def view_transactions(
         click.echo("=" * 120)
         
         for txn in transactions:
-            account_name = accounts.get(txn["account_id"], "Unknown")
+            account_name = accounts.get(txn.account_id, "Unknown")
             category_name = ""
-            if txn["category_id"]:
-                category_name = category_service.format_category_path(txn["category_id"])
+            if txn.category_id:
+                category_name = category_service.format_category_path(txn.category_id)
             else:
                 category_name = "Uncategorized"
             
-            amount_str = f"${txn['amount']:,.2f}"
+            amount_str = f"${txn.amount:,.2f}"
             
-            click.echo(f"\nTransaction ID: {txn['id']}")
-            click.echo(f"  Date: {txn['date']}")
+            click.echo(f"\nTransaction ID: {txn.id}")
+            click.echo(f"  Date: {txn.date}")
             click.echo(f"  Amount: {amount_str}")
-            click.echo(f"  Account: {account_name} (ID: {txn['account_id']})")
+            click.echo(f"  Account: {account_name} (ID: {txn.account_id})")
             click.echo(f"  Category: {category_name}")
-            if txn["description"]:
-                click.echo(f"  Description: {txn['description']}")
-            if txn["reference_number"]:
-                click.echo(f"  Reference: {txn['reference_number']}")
-            click.echo(f"  Unique ID: {txn['unique_id']}")
-            if txn["notes"]:
-                click.echo(f"  Notes: {txn['notes']}")
-            click.echo(f"  Imported: {txn['imported_at']}")
+            if txn.description:
+                click.echo(f"  Description: {txn.description}")
+            if txn.reference_number:
+                click.echo(f"  Reference: {txn.reference_number}")
+            click.echo(f"  Unique ID: {txn.unique_id}")
+            if txn.notes:
+                click.echo(f"  Notes: {txn.notes}")
+            click.echo(f"  Imported: {txn.imported_at}")
             click.echo("-" * 120)
     else:
         # Compact mode: show key columns in a table
@@ -112,23 +112,23 @@ def view_transactions(
         click.echo("-" * 100)
 
         for txn in transactions:
-            account_name = accounts.get(txn["account_id"], "Unknown")
+            account_name = accounts.get(txn.account_id, "Unknown")
             category_name = ""
-            if txn["category_id"]:
-                category_name = category_service.format_category_path(txn["category_id"])
+            if txn.category_id:
+                category_name = category_service.format_category_path(txn.category_id)
 
-            amount_str = f"${txn['amount']:,.2f}"
-            description = (txn["description"] or "")[:30]
+            amount_str = f"${txn.amount:,.2f}"
+            description = (txn.description or "")[:30]
 
             click.echo(
-                f"{txn['id']:<6} {str(txn['date']):<12} {amount_str:<12} {account_name:<20} "
+                f"{txn.id:<6} {str(txn.date):<12} {amount_str:<12} {account_name:<20} "
                 f"{category_name:<30} {description:<30}"
             )
     
     # Show totals
     if transactions:
-        total_expenses = sum(txn["amount"] for txn in transactions if txn["amount"] < 0)
-        total_income = sum(txn["amount"] for txn in transactions if txn["amount"] > 0)
+        total_expenses = sum(txn.amount for txn in transactions if txn.amount < 0)
+        total_income = sum(txn.amount for txn in transactions if txn.amount > 0)
         click.echo("-" * 100)
         click.echo(
             f"{'TOTAL':<6} {'':<12} Expenses: ${abs(total_expenses):,.2f} | "

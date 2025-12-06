@@ -2,6 +2,10 @@
 
 from typing import Optional
 from trackit.database.base import Database
+from trackit.domain.entities import (
+    CSVFormat as CSVFormatEntity,
+    CSVColumnMapping as CSVColumnMappingEntity,
+)
 
 
 class CSVFormatService:
@@ -40,36 +44,36 @@ class CSVFormatService:
 
         return self.db.create_csv_format(name=name, account_id=account_id)
 
-    def get_format(self, format_id: int) -> Optional[dict]:
+    def get_format(self, format_id: int) -> Optional[CSVFormatEntity]:
         """Get CSV format by ID.
 
         Args:
             format_id: Format ID
 
         Returns:
-            Format dict or None if not found
+            Format entity or None if not found
         """
         return self.db.get_csv_format(format_id)
 
-    def get_format_by_name(self, name: str) -> Optional[dict]:
+    def get_format_by_name(self, name: str) -> Optional[CSVFormatEntity]:
         """Get CSV format by name.
 
         Args:
             name: Format name
 
         Returns:
-            Format dict or None if not found
+            Format entity or None if not found
         """
         return self.db.get_csv_format_by_name(name)
 
-    def list_formats(self, account_id: Optional[int] = None) -> list[dict]:
+    def list_formats(self, account_id: Optional[int] = None) -> list[CSVFormatEntity]:
         """List CSV formats.
 
         Args:
             account_id: Optional account ID to filter by
 
         Returns:
-            List of format dicts
+            List of format entities
         """
         return self.db.list_csv_formats(account_id=account_id)
 
@@ -117,14 +121,14 @@ class CSVFormatService:
             is_required=is_required,
         )
 
-    def get_mappings(self, format_id: int) -> list[dict]:
+    def get_mappings(self, format_id: int) -> list[CSVColumnMappingEntity]:
         """Get all column mappings for a format.
 
         Args:
             format_id: Format ID
 
         Returns:
-            List of mapping dicts
+            List of mapping entities
         """
         return self.db.get_column_mappings(format_id)
 
@@ -142,7 +146,7 @@ class CSVFormatService:
             not from the CSV file.
         """
         mappings = self.get_mappings(format_id)
-        mapped_fields = {m["db_field_name"] for m in mappings}
+        mapped_fields = {m.db_field_name for m in mappings}
 
         required_fields = {"unique_id", "date", "amount"}
         missing = required_fields - mapped_fields

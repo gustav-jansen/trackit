@@ -93,7 +93,7 @@ def update_notes(ctx, transaction_id: int, notes: str, clear: bool):
         if txn is None:
             click.echo(f"Error: Transaction {transaction_id} not found", err=True)
             ctx.exit(1)
-        current_notes = txn.get("notes")
+        current_notes = txn.notes
         if current_notes:
             click.echo(f"Current notes: {current_notes}")
         else:

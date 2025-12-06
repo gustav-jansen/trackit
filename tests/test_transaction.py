@@ -14,7 +14,7 @@ def test_add_transaction_minimal(cli_runner, temp_db, sample_account):
             temp_db.database_path,
             "add",
             "--account",
-            str(sample_account["id"]),
+            str(sample_account.id),
             "--date",
             "2024-01-15",
             "--amount",
@@ -79,7 +79,7 @@ def test_add_transaction_full(cli_runner, temp_db, sample_account, sample_catego
             temp_db.database_path,
             "add",
             "--account",
-            str(sample_account["id"]),
+            str(sample_account.id),
             "--date",
             "2024-01-15",
             "--amount",
@@ -139,7 +139,7 @@ def test_view_transactions(cli_runner, temp_db, sample_account, transaction_serv
     
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -160,7 +160,7 @@ def test_view_transactions_verbose(cli_runner, temp_db, sample_account, transact
     
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -184,7 +184,7 @@ def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, tra
     
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -214,7 +214,7 @@ def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account
     
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -243,7 +243,7 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
     # Create uncategorized transaction
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Uncategorized Transaction",
@@ -254,7 +254,7 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
         first_category_id = list(sample_categories.values())[0]
         transaction_service.create_transaction(
             unique_id="TXN002",
-            account_id=sample_account["id"],
+            account_id=sample_account.id,
             date=date(2024, 1, 16),
             amount=Decimal("-25.00"),
             description="Categorized Transaction",
@@ -284,7 +284,7 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
     
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Expense",
@@ -292,7 +292,7 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
     
     transaction_service.create_transaction(
         unique_id="TXN002",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 16),
         amount=Decimal("100.00"),
         description="Income",
@@ -323,7 +323,7 @@ def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_accou
     yesterday = date.today() - timedelta(days=1)
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=yesterday,
         amount=Decimal("-50.00"),
         description="Yesterday's Transaction",
@@ -353,7 +353,7 @@ def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_cate
     
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -384,7 +384,7 @@ def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, s
     for i in range(3):
         txn_id = transaction_service.create_transaction(
             unique_id=f"TXN{i+1:03d}",
-            account_id=sample_account["id"],
+            account_id=sample_account.id,
             date=date(2024, 1, 15 + i),
             amount=Decimal(f"-{10 * (i+1)}.00"),
             description=f"Transaction {i+1}",
@@ -418,7 +418,7 @@ def test_categorize_with_invalid_ids(cli_runner, temp_db, sample_account, sample
     # Create one valid transaction
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -449,7 +449,7 @@ def test_categorize_with_invalid_category(cli_runner, temp_db, sample_account, t
     
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -477,7 +477,7 @@ def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, samp
     
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -510,7 +510,7 @@ def test_notes_add(cli_runner, temp_db, sample_account, transaction_service):
     
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",
@@ -538,7 +538,7 @@ def test_notes_clear(cli_runner, temp_db, sample_account, transaction_service):
     
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Test Transaction",

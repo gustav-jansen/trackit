@@ -56,7 +56,7 @@ def map_column(ctx, format_name: str, csv_column: str, db_field: str, required: 
 
     try:
         mapping_id = service.add_mapping(
-            format_id=fmt["id"],
+            format_id=fmt.id,
             csv_column_name=csv_column,
             db_field_name=db_field,
             is_required=required,
@@ -96,18 +96,18 @@ def list_formats(ctx, account):
     click.echo("\nCSV Formats:")
     click.echo("-" * 60)
     for fmt in formats:
-        mappings = service.get_mappings(fmt["id"])
-        is_valid, missing = service.validate_format(fmt["id"])
+        mappings = service.get_mappings(fmt.id)
+        is_valid, missing = service.validate_format(fmt.id)
 
         status = "✓" if is_valid else "✗"
-        click.echo(f"{status} {fmt['name']} (ID: {fmt['id']}, Account: {fmt['account_id']})")
+        click.echo(f"{status} {fmt.name} (ID: {fmt.id}, Account: {fmt.account_id})")
         if not is_valid:
             click.echo(f"  Missing required fields: {', '.join(missing)}")
         if mappings:
             click.echo("  Mappings:")
             for m in mappings:
-                req = " (required)" if m["is_required"] else ""
-                click.echo(f"    {m['csv_column_name']} -> {m['db_field_name']}{req}")
+                req = " (required)" if m.is_required else ""
+                click.echo(f"    {m.csv_column_name} -> {m.db_field_name}{req}")
 
 
 @format_group.command("show")
@@ -123,12 +123,12 @@ def show_format(ctx, format_name: str):
         click.echo(f"Error: CSV format '{format_name}' not found", err=True)
         ctx.exit(1)
 
-    mappings = service.get_mappings(fmt["id"])
-    is_valid, missing = service.validate_format(fmt["id"])
+    mappings = service.get_mappings(fmt.id)
+    is_valid, missing = service.validate_format(fmt.id)
 
-    click.echo(f"\nFormat: {fmt['name']}")
-    click.echo(f"ID: {fmt['id']}")
-    click.echo(f"Account ID: {fmt['account_id']}")
+    click.echo(f"\nFormat: {fmt.name}")
+    click.echo(f"ID: {fmt.id}")
+    click.echo(f"Account ID: {fmt.account_id}")
     click.echo(f"Valid: {'Yes' if is_valid else 'No'}")
     if not is_valid:
         click.echo(f"Missing required fields: {', '.join(missing)}")
@@ -138,8 +138,8 @@ def show_format(ctx, format_name: str):
         click.echo("  (none)")
     else:
         for m in mappings:
-            req = " (required)" if m["is_required"] else ""
-            click.echo(f"  {m['csv_column_name']} -> {m['db_field_name']}{req}")
+            req = " (required)" if m.is_required else ""
+            click.echo(f"  {m.csv_column_name} -> {m.db_field_name}{req}")
 
 
 def register_commands(cli):

@@ -23,7 +23,7 @@ def test_summary_basic(cli_runner, temp_db, sample_account, sample_categories, t
     # Add some transactions
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Groceries",
@@ -32,7 +32,7 @@ def test_summary_basic(cli_runner, temp_db, sample_account, sample_categories, t
     
     transaction_service.create_transaction(
         unique_id="TXN002",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 16),
         amount=Decimal("-25.50"),
         description="Coffee",
@@ -55,7 +55,7 @@ def test_summary_with_date_filter(cli_runner, temp_db, sample_account, sample_ca
     
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Groceries",
@@ -86,7 +86,7 @@ def test_summary_with_category_filter(cli_runner, temp_db, sample_account, sampl
     
     transaction_service.create_transaction(
         unique_id="TXN001",
-        account_id=sample_account["id"],
+        account_id=sample_account.id,
         date=date(2024, 1, 15),
         amount=Decimal("-50.00"),
         description="Groceries",

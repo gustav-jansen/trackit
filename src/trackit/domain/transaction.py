@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import date
 from decimal import Decimal
 from trackit.database.base import Database
+from trackit.domain.entities import Transaction as TransactionEntity
 
 
 class TransactionService:
@@ -74,14 +75,14 @@ class TransactionService:
             notes=notes,
         )
 
-    def get_transaction(self, transaction_id: int) -> Optional[dict]:
+    def get_transaction(self, transaction_id: int) -> Optional[TransactionEntity]:
         """Get transaction by ID.
 
         Args:
             transaction_id: Transaction ID
 
         Returns:
-            Transaction dict or None if not found
+            Transaction entity or None if not found
         """
         return self.db.get_transaction(transaction_id)
 
@@ -105,7 +106,7 @@ class TransactionService:
             category = self.db.get_category_by_path(category_path)
             if category is None:
                 raise ValueError(f"Category '{category_path}' not found")
-            category_id = category["id"]
+            category_id = category.id
 
         self.db.update_transaction_category(transaction_id, category_id)
 
@@ -132,7 +133,7 @@ class TransactionService:
         end_date: Optional[date] = None,
         category_path: Optional[str] = None,
         account_id: Optional[int] = None,
-    ) -> list[dict]:
+    ) -> list[TransactionEntity]:
         """List transactions with filters.
 
         Args:
@@ -142,7 +143,7 @@ class TransactionService:
             account_id: Optional account ID filter
 
         Returns:
-            List of transaction dicts
+            List of transaction entities
         """
         category_id = None
         uncategorized = False
@@ -153,7 +154,7 @@ class TransactionService:
             else:
                 category = self.db.get_category_by_path(category_path)
                 if category is not None:
-                    category_id = category["id"]
+                    category_id = category.id
 
         return self.db.list_transactions(
             start_date=start_date,
@@ -183,7 +184,7 @@ class TransactionService:
         if category_path is not None:
             category = self.db.get_category_by_path(category_path)
             if category is not None:
-                category_id = category["id"]
+                category_id = category.id
 
         return self.db.get_category_summary(
             start_date=start_date, end_date=end_date, category_id=category_id

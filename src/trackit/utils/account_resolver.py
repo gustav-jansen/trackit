@@ -39,8 +39,8 @@ def resolve_account(account_service: AccountService, account: str | int) -> int:
     # Try to find by name
     accounts = account_service.list_accounts()
     for acc in accounts:
-        if acc["name"] == account:
-            return acc["id"]
+        if acc.name == account:
+            return acc.id
     
     raise ValueError(f"Account '{account}' not found")
 
