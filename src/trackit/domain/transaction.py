@@ -127,6 +127,91 @@ class TransactionService:
 
         self.db.update_transaction_notes(transaction_id, notes)
 
+    def update_transaction(
+        self,
+        transaction_id: int,
+        account_id: Optional[int] = None,
+        date: Optional[date] = None,
+        amount: Optional[Decimal] = None,
+        description: Optional[str] = None,
+        reference_number: Optional[str] = None,
+        category_id: Optional[int] = None,
+        notes: Optional[str] = None,
+        clear_category: bool = False,
+    ) -> None:
+        """Update transaction fields.
+
+        Args:
+            transaction_id: Transaction ID to update
+            account_id: Optional new account ID
+            date: Optional new date
+            amount: Optional new amount
+            description: Optional new description
+            reference_number: Optional new reference number
+            category_id: Optional new category ID
+            notes: Optional new notes
+            clear_category: If True, clear the category (category_id must be None)
+
+        Raises:
+            ValueError: If transaction doesn't exist or account/category doesn't exist
+        """
+        # Verify transaction exists
+        txn = self.db.get_transaction(transaction_id)
+        if txn is None:
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        # Verify account if provided
+        if account_id is not None:
+            account = self.db.get_account(account_id)
+            if account is None:
+                raise ValueError(f"Account {account_id} not found")
+
+        # Handle category update or clear
+        if clear_category:
+            if category_id is not None:
+                raise ValueError("Cannot set both category_id and clear_category")
+            category_id_to_update = None
+            update_category_flag = True
+        elif category_id is not None:
+            # Verify category exists
+            category = self.db.get_category(category_id)
+            if category is None:
+                raise ValueError(f"Category {category_id} not found")
+            category_id_to_update = category_id
+            update_category_flag = False
+        else:
+            # category_id not provided, don't update
+            category_id_to_update = None
+            update_category_flag = False
+
+        self.db.update_transaction(
+            transaction_id=transaction_id,
+            account_id=account_id,
+            date=date,
+            amount=amount,
+            description=description,
+            reference_number=reference_number,
+            category_id=category_id_to_update,
+            notes=notes,
+            update_category=update_category_flag,
+        )
+
+    def delete_transaction(self, transaction_id: int) -> None:
+        """Delete a transaction.
+
+        Args:
+            transaction_id: Transaction ID to delete
+
+        Raises:
+            ValueError: If transaction doesn't exist
+        """
+        # Verify transaction exists
+        txn = self.db.get_transaction(transaction_id)
+        if txn is None:
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        self.db.delete_transaction(transaction_id)
+
     def list_transactions(
         self,
         start_date: Optional[date] = None,

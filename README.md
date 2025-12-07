@@ -57,6 +57,12 @@ pip install -e .
    trackit account create "My Checking" --bank "Chase"
    ```
 
+   You can rename or delete accounts later:
+   ```bash
+   trackit account rename "Chase" "Chase Checking"
+   trackit account delete "Old Account"  # Only if no transactions/formats
+   ```
+
 3. **Create a CSV format** for your bank's export format:
    ```bash
    trackit format create "Chase Format" --account "Chase"
@@ -78,11 +84,11 @@ pip install -e .
 
 6. **View transactions**:
    ```bash
-   trackit view
-   trackit view --start-date 2024-01-01 --end-date 2024-01-31
-   trackit view --category "Food & Dining > Groceries" --verbose
-   trackit view --account "Chase" --uncategorized
-   trackit view --start-date "last month" --end-date "today"
+   trackit transaction list
+   trackit transaction list --start-date 2024-01-01 --end-date 2024-01-31
+   trackit transaction list --category "Food & Dining > Groceries" --verbose
+   trackit transaction list --account "Chase" --uncategorized
+   trackit transaction list --start-date "last month" --end-date "today"
    ```
 
 7. **Categorize transactions**:
@@ -97,12 +103,33 @@ pip install -e .
    trackit summary --start-date 2024-01-01 --end-date 2024-01-31
    ```
 
+9. **Manage transactions and formats**:
+   ```bash
+   # Update a transaction
+   trackit transaction update 1 --amount -75.00 --category "Food & Dining > Groceries"
+   trackit transaction update 1 --account "Chase"  # Reassign to different account
+
+   # Delete a transaction
+   trackit transaction delete 1
+
+   # Update a CSV format
+   trackit format update "Chase Format" --name "Chase New Format"
+   trackit format update "Chase Format" --account "Wells Fargo"  # Reassign to different account
+
+   # Delete a CSV format
+   trackit format delete "Old Format"
+   ```
+
+**Note**: To delete an account, you must first delete or reassign all its transactions and CSV formats. This prevents accidental data loss.
+
 ## Commands
 
 ### Account Management
 
 - `trackit account create <name> [--bank <bank_name>]` - Create a new account
 - `trackit account list` - List all accounts
+- `trackit account rename <name_or_id> <new_name> [--bank <bank_name>]` - Rename an account
+- `trackit account delete <name_or_id>` - Delete an account (only if no transactions/formats)
 
 ### CSV Format Management
 
@@ -110,14 +137,18 @@ pip install -e .
 - `trackit format map <format_name> <csv_column> <db_field> [--required]` - Map CSV columns
 - `trackit format list [--account <name_or_id>]` - List CSV formats
 - `trackit format show <format_name>` - Show format details
+- `trackit format update <format_name> [--name <new_name>] [--account <account>]` - Update format name or account
+- `trackit format delete <format_name>` - Delete a CSV format
 
 ### Transaction Management
 
 - `trackit import <csv_file> --format <format_name>` - Import transactions from CSV
 - `trackit add --account <name_or_id> --date <date> --amount <amount> [options]` - Add transaction manually
-- `trackit view [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
+- `trackit transaction list [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
 - `trackit categorize <transaction_id> [transaction_id ...] <category_path>` - Assign category to one or more transactions
 - `trackit notes <transaction_id> [<notes>] [--clear]` - Update transaction notes
+- `trackit transaction update <id> [--account <account>] [--date <date>] [--amount <amount>] [--description <desc>] [--reference <ref>] [--category <category>] [--notes <notes>]` - Update transaction fields
+- `trackit transaction delete <id>` - Delete a transaction
 
 **Note**: Account can be specified by name or ID in most commands. Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.
 
@@ -176,7 +207,7 @@ Categories support unlimited depth. Use `>` to separate levels in category paths
 Most commands that accept an account ID also accept an account name for convenience:
 ```bash
 trackit add --account "Chase" --date today --amount -50.00
-trackit view --account "Chase"
+trackit transaction list --account "Chase"
 trackit format create "My Format" --account "Chase"
 ```
 
@@ -191,7 +222,7 @@ The date parser supports relative dates for easier filtering:
 
 Examples:
 ```bash
-trackit view --start-date "last month" --end-date "today"
+trackit transaction list --start-date "last month" --end-date "today"
 trackit summary --start-date "this year"
 trackit add --account "Chase" --date "yesterday" --amount -25.00
 ```
@@ -200,12 +231,12 @@ trackit add --account "Chase" --date "yesterday" --amount -25.00
 
 Filter to see only transactions that haven't been categorized:
 ```bash
-trackit view --uncategorized
+trackit transaction list --uncategorized
 ```
 
 ### Transaction Totals
 
-The `view` command automatically displays totals at the bottom:
+The `transaction list` command automatically displays totals at the bottom:
 - Total expenses (sum of negative amounts)
 - Total income (sum of positive amounts)
 - Transaction count
