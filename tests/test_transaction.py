@@ -124,7 +124,7 @@ def test_add_transaction_invalid_account(cli_runner, temp_db):
 def test_view_transactions_empty(cli_runner, temp_db):
     """Test viewing transactions when none exist."""
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "view"]
+        cli, ["--db-path", temp_db.database_path, "transaction", "list"]
     )
 
     assert result.exit_code == 0
@@ -146,7 +146,7 @@ def test_view_transactions(cli_runner, temp_db, sample_account, transaction_serv
     )
 
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "view"]
+        cli, ["--db-path", temp_db.database_path, "transaction", "list"]
     )
 
     assert result.exit_code == 0
@@ -168,7 +168,7 @@ def test_view_transactions_verbose(cli_runner, temp_db, sample_account, transact
     )
 
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "view", "--verbose"]
+        cli, ["--db-path", temp_db.database_path, "transaction", "list", "--verbose"]
     )
 
     assert result.exit_code == 0
@@ -195,7 +195,8 @@ def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, tra
         [
             "--db-path",
             temp_db.database_path,
-            "view",
+            "transaction",
+            "list",
             "--start-date",
             "2024-01-01",
             "--end-date",
@@ -225,7 +226,8 @@ def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account
         [
             "--db-path",
             temp_db.database_path,
-            "view",
+            "transaction",
+            "list",
             "--account",
             "Test Account",
         ],
@@ -266,7 +268,8 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
         [
             "--db-path",
             temp_db.database_path,
-            "view",
+            "transaction",
+            "list",
             "--uncategorized",
         ],
     )
@@ -278,7 +281,7 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
 
 
 def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, transaction_service):
-    """Test that view command shows totals."""
+    """Test that transaction list command shows totals."""
     from datetime import date
     from decimal import Decimal
 
@@ -303,7 +306,8 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
         [
             "--db-path",
             temp_db.database_path,
-            "view",
+            "transaction",
+            "list",
         ],
     )
 
@@ -334,7 +338,8 @@ def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_accou
         [
             "--db-path",
             temp_db.database_path,
-            "view",
+            "transaction",
+            "list",
             "--start-date",
             "yesterday",
             "--end-date",

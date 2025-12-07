@@ -9,7 +9,6 @@ from trackit.cli.commands import (
     format,
     import_cmd,
     categorize,
-    view,
     summary,
     init_categories,
     category,
@@ -48,7 +47,6 @@ account.register_commands(cli)
 format.register_commands(cli)
 import_cmd.register_commands(cli)
 categorize.register_commands(cli)
-view.register_commands(cli)
 summary.register_commands(cli)
 init_categories.register_commands(cli)
 category.register_commands(cli)

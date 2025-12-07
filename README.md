@@ -84,11 +84,11 @@ pip install -e .
 
 6. **View transactions**:
    ```bash
-   trackit view
-   trackit view --start-date 2024-01-01 --end-date 2024-01-31
-   trackit view --category "Food & Dining > Groceries" --verbose
-   trackit view --account "Chase" --uncategorized
-   trackit view --start-date "last month" --end-date "today"
+   trackit transaction list
+   trackit transaction list --start-date 2024-01-01 --end-date 2024-01-31
+   trackit transaction list --category "Food & Dining > Groceries" --verbose
+   trackit transaction list --account "Chase" --uncategorized
+   trackit transaction list --start-date "last month" --end-date "today"
    ```
 
 7. **Categorize transactions**:
@@ -144,7 +144,7 @@ pip install -e .
 
 - `trackit import <csv_file> --format <format_name>` - Import transactions from CSV
 - `trackit add --account <name_or_id> --date <date> --amount <amount> [options]` - Add transaction manually
-- `trackit view [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
+- `trackit transaction list [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
 - `trackit categorize <transaction_id> [transaction_id ...] <category_path>` - Assign category to one or more transactions
 - `trackit notes <transaction_id> [<notes>] [--clear]` - Update transaction notes
 - `trackit transaction update <id> [--account <account>] [--date <date>] [--amount <amount>] [--description <desc>] [--reference <ref>] [--category <category>] [--notes <notes>]` - Update transaction fields
@@ -207,7 +207,7 @@ Categories support unlimited depth. Use `>` to separate levels in category paths
 Most commands that accept an account ID also accept an account name for convenience:
 ```bash
 trackit add --account "Chase" --date today --amount -50.00
-trackit view --account "Chase"
+trackit transaction list --account "Chase"
 trackit format create "My Format" --account "Chase"
 ```
 
@@ -222,7 +222,7 @@ The date parser supports relative dates for easier filtering:
 
 Examples:
 ```bash
-trackit view --start-date "last month" --end-date "today"
+trackit transaction list --start-date "last month" --end-date "today"
 trackit summary --start-date "this year"
 trackit add --account "Chase" --date "yesterday" --amount -25.00
 ```
@@ -231,12 +231,12 @@ trackit add --account "Chase" --date "yesterday" --amount -25.00
 
 Filter to see only transactions that haven't been categorized:
 ```bash
-trackit view --uncategorized
+trackit transaction list --uncategorized
 ```
 
 ### Transaction Totals
 
-The `view` command automatically displays totals at the bottom:
+The `transaction list` command automatically displays totals at the bottom:
 - Total expenses (sum of negative amounts)
 - Total income (sum of positive amounts)
 - Transaction count
