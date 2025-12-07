@@ -21,7 +21,7 @@ def test_add_transaction_minimal(cli_runner, temp_db, sample_account):
             "-50.00",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Created transaction" in result.output
     assert "Test Account" in result.output
@@ -43,7 +43,7 @@ def test_add_transaction_with_account_name(cli_runner, temp_db, sample_account):
             "-50.00",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Created transaction" in result.output
     assert "Test Account" in result.output
@@ -65,7 +65,7 @@ def test_add_transaction_with_relative_date(cli_runner, temp_db, sample_account)
             "-50.00",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Created transaction" in result.output
 
@@ -94,7 +94,7 @@ def test_add_transaction_full(cli_runner, temp_db, sample_account, sample_catego
             "Weekly shopping",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Created transaction" in result.output
     assert "Grocery Store" in result.output
@@ -116,7 +116,7 @@ def test_add_transaction_invalid_account(cli_runner, temp_db):
             "-50.00",
         ],
     )
-    
+
     assert result.exit_code == 1
     assert "not found" in result.output.lower()
 
@@ -126,7 +126,7 @@ def test_view_transactions_empty(cli_runner, temp_db):
     result = cli_runner.invoke(
         cli, ["--db-path", temp_db.database_path, "view"]
     )
-    
+
     assert result.exit_code == 0
     assert "No transactions found" in result.output
 
@@ -136,7 +136,7 @@ def test_view_transactions(cli_runner, temp_db, sample_account, transaction_serv
     # Add a transaction
     from datetime import date
     from decimal import Decimal
-    
+
     transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -144,11 +144,11 @@ def test_view_transactions(cli_runner, temp_db, sample_account, transaction_serv
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli, ["--db-path", temp_db.database_path, "view"]
     )
-    
+
     assert result.exit_code == 0
     assert "TXN001" in result.output or "Test Transaction" in result.output
 
@@ -157,7 +157,7 @@ def test_view_transactions_verbose(cli_runner, temp_db, sample_account, transact
     """Test viewing transactions in verbose mode."""
     from datetime import date
     from decimal import Decimal
-    
+
     transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -166,11 +166,11 @@ def test_view_transactions_verbose(cli_runner, temp_db, sample_account, transact
         description="Test Transaction",
         notes="Test notes",
     )
-    
+
     result = cli_runner.invoke(
         cli, ["--db-path", temp_db.database_path, "view", "--verbose"]
     )
-    
+
     assert result.exit_code == 0
     assert "Transaction ID:" in result.output
     assert "Notes:" in result.output
@@ -181,7 +181,7 @@ def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, tra
     """Test viewing transactions with date filters."""
     from datetime import date
     from decimal import Decimal
-    
+
     transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -189,7 +189,7 @@ def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, tra
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -202,7 +202,7 @@ def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, tra
             "2024-01-31",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "transaction" in result.output.lower()
 
@@ -211,7 +211,7 @@ def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account
     """Test viewing transactions using account name."""
     from datetime import date
     from decimal import Decimal
-    
+
     transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -219,7 +219,7 @@ def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -230,7 +230,7 @@ def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account
             "Test Account",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "TXN001" in result.output or "Test Transaction" in result.output
 
@@ -239,7 +239,7 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
     """Test viewing uncategorized transactions."""
     from datetime import date
     from decimal import Decimal
-    
+
     # Create uncategorized transaction
     transaction_service.create_transaction(
         unique_id="TXN001",
@@ -248,7 +248,7 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
         amount=Decimal("-50.00"),
         description="Uncategorized Transaction",
     )
-    
+
     # Create categorized transaction (use a valid category from sample_categories)
     if sample_categories:
         first_category_id = list(sample_categories.values())[0]
@@ -260,7 +260,7 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
             description="Categorized Transaction",
             category_id=first_category_id,
         )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -270,7 +270,7 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
             "--uncategorized",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Uncategorized Transaction" in result.output
     if sample_categories:
@@ -281,7 +281,7 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
     """Test that view command shows totals."""
     from datetime import date
     from decimal import Decimal
-    
+
     transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -289,7 +289,7 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
         amount=Decimal("-50.00"),
         description="Expense",
     )
-    
+
     transaction_service.create_transaction(
         unique_id="TXN002",
         account_id=sample_account.id,
@@ -297,7 +297,7 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
         amount=Decimal("100.00"),
         description="Income",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -306,7 +306,7 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
             "view",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "TOTAL" in result.output
     assert "Expenses:" in result.output
@@ -318,7 +318,7 @@ def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_accou
     """Test viewing transactions with relative dates."""
     from datetime import date, timedelta
     from decimal import Decimal
-    
+
     # Create transaction from yesterday
     yesterday = date.today() - timedelta(days=1)
     transaction_service.create_transaction(
@@ -328,7 +328,7 @@ def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_accou
         amount=Decimal("-50.00"),
         description="Yesterday's Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -341,7 +341,7 @@ def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_accou
             "today",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "transaction" in result.output.lower() or "Yesterday's Transaction" in result.output
 
@@ -350,7 +350,7 @@ def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_cate
     """Test categorizing a single transaction (backward compatibility)."""
     from datetime import date
     from decimal import Decimal
-    
+
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -358,7 +358,7 @@ def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_cate
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -369,7 +369,7 @@ def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_cate
             "Food & Dining > Groceries",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "categorized" in result.output.lower()
 
@@ -378,7 +378,7 @@ def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, s
     """Test categorizing multiple transactions."""
     from datetime import date
     from decimal import Decimal
-    
+
     # Create multiple transactions
     txn_ids = []
     for i in range(3):
@@ -390,7 +390,7 @@ def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, s
             description=f"Transaction {i+1}",
         )
         txn_ids.append(txn_id)
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -403,7 +403,7 @@ def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, s
             "Food & Dining > Groceries",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Categorizing 3 transactions" in result.output
     assert "succeeded" in result.output.lower()
@@ -414,7 +414,7 @@ def test_categorize_with_invalid_ids(cli_runner, temp_db, sample_account, sample
     """Test categorizing with mix of valid and invalid transaction IDs."""
     from datetime import date
     from decimal import Decimal
-    
+
     # Create one valid transaction
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
@@ -423,7 +423,7 @@ def test_categorize_with_invalid_ids(cli_runner, temp_db, sample_account, sample
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -435,7 +435,7 @@ def test_categorize_with_invalid_ids(cli_runner, temp_db, sample_account, sample
             "Food & Dining > Groceries",
         ],
     )
-    
+
     assert result.exit_code == 1  # Should exit with error due to failures
     assert "Categorizing 2 transactions" in result.output
     assert "succeeded" in result.output.lower()
@@ -446,7 +446,7 @@ def test_categorize_with_invalid_category(cli_runner, temp_db, sample_account, t
     """Test categorizing with invalid category."""
     from datetime import date
     from decimal import Decimal
-    
+
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -454,7 +454,7 @@ def test_categorize_with_invalid_category(cli_runner, temp_db, sample_account, t
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -465,7 +465,7 @@ def test_categorize_with_invalid_category(cli_runner, temp_db, sample_account, t
             "Non Existent Category",
         ],
     )
-    
+
     assert result.exit_code == 1
     assert "not found" in result.output.lower()
 
@@ -474,7 +474,7 @@ def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, samp
     """Test categorizing with duplicate transaction IDs."""
     from datetime import date
     from decimal import Decimal
-    
+
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -482,7 +482,7 @@ def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, samp
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -495,7 +495,7 @@ def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, samp
             "Food & Dining > Groceries",
         ],
     )
-    
+
     assert result.exit_code == 0
     # After removing duplicates, only one unique ID remains, so it uses single-transaction format
     assert "categorized" in result.output.lower()
@@ -507,7 +507,7 @@ def test_notes_add(cli_runner, temp_db, sample_account, transaction_service):
     """Test adding notes to a transaction."""
     from datetime import date
     from decimal import Decimal
-    
+
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -515,7 +515,7 @@ def test_notes_add(cli_runner, temp_db, sample_account, transaction_service):
         amount=Decimal("-50.00"),
         description="Test Transaction",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -526,7 +526,7 @@ def test_notes_add(cli_runner, temp_db, sample_account, transaction_service):
             "Test notes",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Updated notes" in result.output
 
@@ -535,7 +535,7 @@ def test_notes_clear(cli_runner, temp_db, sample_account, transaction_service):
     """Test clearing notes from a transaction."""
     from datetime import date
     from decimal import Decimal
-    
+
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -544,7 +544,7 @@ def test_notes_clear(cli_runner, temp_db, sample_account, transaction_service):
         description="Test Transaction",
         notes="Existing notes",
     )
-    
+
     result = cli_runner.invoke(
         cli,
         [
@@ -555,7 +555,230 @@ def test_notes_clear(cli_runner, temp_db, sample_account, transaction_service):
             "--clear",
         ],
     )
-    
+
     assert result.exit_code == 0
     assert "Cleared notes" in result.output
+
+
+def test_transaction_update_all_fields(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test updating all transaction fields."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create second account
+    from trackit.domain.account import AccountService
+    account_service = AccountService(temp_db)
+    account2_id = account_service.create_account("Account 2", "Bank 2")
+
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Original Description",
+        reference_number="REF001",
+        notes="Original notes",
+    )
+
+    # Get a category ID if available
+    category_path = None
+    if sample_categories:
+        category_path = "Food & Dining > Groceries"
+
+    cmd = [
+        "--db-path",
+        temp_db.database_path,
+        "transaction",
+        "update",
+        str(txn_id),
+        "--account",
+        "Account 2",
+        "--date",
+        "2024-02-20",
+        "--amount",
+        "-75.00",
+        "--description",
+        "Updated Description",
+        "--reference",
+        "REF002",
+        "--notes",
+        "Updated notes",
+    ]
+    if category_path:
+        cmd.extend(["--category", category_path])
+
+    result = cli_runner.invoke(cli, cmd)
+
+    assert result.exit_code == 0
+    assert "Updated transaction" in result.output
+
+
+def test_transaction_update_partial(cli_runner, temp_db, sample_account, transaction_service):
+    """Test updating only some transaction fields."""
+    from datetime import date
+    from decimal import Decimal
+
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Original Description",
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "update",
+            str(txn_id),
+            "--amount",
+            "-75.00",
+            "--description",
+            "Updated Description",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Updated transaction" in result.output
+
+
+def test_transaction_update_not_found(cli_runner, temp_db):
+    """Test updating non-existent transaction fails."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "update",
+            "99999",
+            "--amount",
+            "-75.00",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+
+
+def test_transaction_update_clear_category(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test clearing category by setting it to empty string."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Get a category ID
+    category_id = None
+    if sample_categories:
+        category_id = list(sample_categories.values())[0]
+
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+        category_id=category_id,
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "update",
+            str(txn_id),
+            "--category",
+            "",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Updated transaction" in result.output
+
+
+def test_transaction_delete(cli_runner, temp_db, sample_account, transaction_service):
+    """Test deleting a transaction with confirmation."""
+    from datetime import date
+    from decimal import Decimal
+
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "delete",
+            str(txn_id),
+        ],
+        input="y\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Deleted transaction" in result.output
+
+    # Verify transaction is deleted
+    txn = transaction_service.get_transaction(txn_id)
+    assert txn is None
+
+
+def test_transaction_delete_without_confirmation(cli_runner, temp_db, sample_account, transaction_service):
+    """Test that deletion is cancelled without confirmation."""
+    from datetime import date
+    from decimal import Decimal
+
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "delete",
+            str(txn_id),
+        ],
+        input="n\n",
+    )
+
+    assert result.exit_code == 0
+    assert "Deletion cancelled" in result.output
+
+    # Verify transaction still exists
+    txn = transaction_service.get_transaction(txn_id)
+    assert txn is not None
+
+
+def test_transaction_delete_not_found(cli_runner, temp_db):
+    """Test deleting non-existent transaction fails."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "delete",
+            "99999",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
 

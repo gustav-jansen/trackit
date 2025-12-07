@@ -14,6 +14,7 @@ from trackit.cli.commands import (
     init_categories,
     category,
     add,
+    transaction,
 )
 
 
@@ -27,12 +28,12 @@ from trackit.cli.commands import (
 @click.pass_context
 def cli(ctx, db_path: str | None):
     """Trackit - Expense tracking application.
-    
+
     Track and categorize your expenses with support for importing CSV files
     from multiple banks with different formats.
     """
     ctx.ensure_object(dict)
-    
+
     # Initialize database connection only when actually running a command
     # (not when showing help)
     if ctx.invoked_subcommand is not None:
@@ -52,6 +53,7 @@ summary.register_commands(cli)
 init_categories.register_commands(cli)
 category.register_commands(cli)
 add.register_commands(cli)
+transaction.register_commands(cli)
 
 
 def main():

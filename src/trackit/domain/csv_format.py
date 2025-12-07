@@ -140,7 +140,7 @@ class CSVFormatService:
 
         Returns:
             Tuple of (is_valid, list of missing required fields)
-        
+
         Note:
             account_name is not required as it comes from the format's account_id,
             not from the CSV file.
@@ -152,4 +152,52 @@ class CSVFormatService:
         missing = required_fields - mapped_fields
 
         return (len(missing) == 0, list(missing))
+
+    def update_format(
+        self, format_id: int, name: Optional[str] = None, account_id: Optional[int] = None
+    ) -> None:
+        """Update CSV format fields.
+
+        Args:
+            format_id: Format ID to update
+            name: Optional new format name
+            account_id: Optional new account ID
+
+        Raises:
+            ValueError: If format not found, name already exists, or account doesn't exist
+        """
+        # Verify format exists
+        fmt = self.db.get_csv_format(format_id)
+        if fmt is None:
+            raise ValueError(f"CSV format {format_id} not found")
+
+        # Check for duplicate name if updating name
+        if name is not None:
+            existing = self.db.get_csv_format_by_name(name)
+            if existing is not None and existing.id != format_id:
+                raise ValueError(f"CSV format with name '{name}' already exists")
+
+        # Verify account if provided
+        if account_id is not None:
+            account = self.db.get_account(account_id)
+            if account is None:
+                raise ValueError(f"Account {account_id} not found")
+
+        self.db.update_csv_format(format_id=format_id, name=name, account_id=account_id)
+
+    def delete_format(self, format_id: int) -> None:
+        """Delete a CSV format.
+
+        Args:
+            format_id: Format ID to delete
+
+        Raises:
+            ValueError: If format doesn't exist
+        """
+        # Verify format exists
+        fmt = self.db.get_csv_format(format_id)
+        if fmt is None:
+            raise ValueError(f"CSV format {format_id} not found")
+
+        self.db.delete_csv_format(format_id)
 

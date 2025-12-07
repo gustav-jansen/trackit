@@ -90,6 +90,59 @@ class SQLAlchemyDatabase(Database):
         accounts = session.query(Account).order_by(Account.name).all()
         return [account_to_domain(acc) for acc in accounts]
 
+    def update_account_name(self, account_id: int, name: str, bank_name: Optional[str] = None) -> None:
+        """Update account name and optionally bank name."""
+        session = self._get_session()
+        account = session.query(Account).filter(Account.id == account_id).first()
+        if account is None:
+            raise ValueError(f"Account {account_id} not found")
+
+        # Check for duplicate name (excluding current account)
+        existing = session.query(Account).filter(Account.name == name, Account.id != account_id).first()
+        if existing is not None:
+            raise ValueError(f"Account with name '{name}' already exists")
+
+        account.name = name
+        if bank_name is not None:
+            account.bank_name = bank_name
+        session.commit()
+
+    def delete_account(self, account_id: int) -> None:
+        """Delete an account."""
+        session = self._get_session()
+        account = session.query(Account).filter(Account.id == account_id).first()
+        if account is None:
+            raise ValueError(f"Account {account_id} not found")
+
+        # Check for associated transactions
+        transaction_count = session.query(Transaction).filter(Transaction.account_id == account_id).count()
+        # Check for associated formats
+        format_count = session.query(CSVFormat).filter(CSVFormat.account_id == account_id).count()
+
+        if transaction_count > 0 or format_count > 0:
+            parts = []
+            if transaction_count > 0:
+                parts.append(f"{transaction_count} transaction{'s' if transaction_count != 1 else ''}")
+            if format_count > 0:
+                parts.append(f"{format_count} CSV format{'s' if format_count != 1 else ''}")
+            raise ValueError(
+                f"Cannot delete account {account_id}: it has {', '.join(parts)}. "
+                f"Please reassign or delete them first."
+            )
+
+        session.delete(account)
+        session.commit()
+
+    def get_account_transaction_count(self, account_id: int) -> int:
+        """Get count of transactions associated with an account."""
+        session = self._get_session()
+        return session.query(Transaction).filter(Transaction.account_id == account_id).count()
+
+    def get_account_format_count(self, account_id: int) -> int:
+        """Get count of CSV formats associated with an account."""
+        session = self._get_session()
+        return session.query(CSVFormat).filter(CSVFormat.account_id == account_id).count()
+
     # CSV Format operations
     def create_csv_format(self, name: str, account_id: int) -> int:
         """Create a new CSV format. Returns format ID."""
@@ -150,6 +203,34 @@ class SQLAlchemyDatabase(Database):
             .all()
         )
         return [csv_column_mapping_to_domain(m) for m in mappings]
+
+    def update_csv_format(self, format_id: int, name: Optional[str] = None, account_id: Optional[int] = None) -> None:
+        """Update CSV format fields."""
+        session = self._get_session()
+        fmt = session.query(CSVFormat).filter(CSVFormat.id == format_id).first()
+        if fmt is None:
+            raise ValueError(f"CSV format {format_id} not found")
+
+        if name is not None:
+            # Check for duplicate name (excluding current format)
+            existing = session.query(CSVFormat).filter(CSVFormat.name == name, CSVFormat.id != format_id).first()
+            if existing is not None:
+                raise ValueError(f"CSV format with name '{name}' already exists")
+            fmt.name = name
+
+        if account_id is not None:
+            fmt.account_id = account_id
+
+        session.commit()
+
+    def delete_csv_format(self, format_id: int) -> None:
+        """Delete a CSV format."""
+        session = self._get_session()
+        fmt = session.query(CSVFormat).filter(CSVFormat.id == format_id).first()
+        if fmt is None:
+            raise ValueError(f"CSV format {format_id} not found")
+        session.delete(fmt)
+        session.commit()
 
     # Category operations
     def create_category(self, name: str, parent_id: Optional[int] = None) -> int:
@@ -291,6 +372,56 @@ class SQLAlchemyDatabase(Database):
         if transaction is None:
             raise ValueError(f"Transaction {transaction_id} not found")
         transaction.notes = notes
+        session.commit()
+
+    def update_transaction(
+        self,
+        transaction_id: int,
+        account_id: Optional[int] = None,
+        date: Optional[date] = None,
+        amount: Optional[Decimal] = None,
+        description: Optional[str] = None,
+        reference_number: Optional[str] = None,
+        category_id: Optional[int] = None,
+        notes: Optional[str] = None,
+        update_category: bool = False,
+    ) -> None:
+        """Update transaction fields.
+
+        Args:
+            update_category: If True, update category_id even if it's None (to clear it)
+        """
+        session = self._get_session()
+        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        if transaction is None:
+            raise ValueError(f"Transaction {transaction_id} not found")
+
+        if account_id is not None:
+            transaction.account_id = account_id
+        if date is not None:
+            transaction.date = date
+        if amount is not None:
+            transaction.amount = amount
+        if description is not None:
+            transaction.description = description
+        if reference_number is not None:
+            transaction.reference_number = reference_number
+        if update_category:
+            transaction.category_id = category_id
+        elif category_id is not None:
+            transaction.category_id = category_id
+        if notes is not None:
+            transaction.notes = notes
+
+        session.commit()
+
+    def delete_transaction(self, transaction_id: int) -> None:
+        """Delete a transaction."""
+        session = self._get_session()
+        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        if transaction is None:
+            raise ValueError(f"Transaction {transaction_id} not found")
+        session.delete(transaction)
         session.commit()
 
     def list_transactions(

@@ -57,6 +57,12 @@ pip install -e .
    trackit account create "My Checking" --bank "Chase"
    ```
 
+   You can rename or delete accounts later:
+   ```bash
+   trackit account rename "Chase" "Chase Checking"
+   trackit account delete "Old Account"  # Only if no transactions/formats
+   ```
+
 3. **Create a CSV format** for your bank's export format:
    ```bash
    trackit format create "Chase Format" --account "Chase"
@@ -97,12 +103,33 @@ pip install -e .
    trackit summary --start-date 2024-01-01 --end-date 2024-01-31
    ```
 
+9. **Manage transactions and formats**:
+   ```bash
+   # Update a transaction
+   trackit transaction update 1 --amount -75.00 --category "Food & Dining > Groceries"
+   trackit transaction update 1 --account "Chase"  # Reassign to different account
+
+   # Delete a transaction
+   trackit transaction delete 1
+
+   # Update a CSV format
+   trackit format update "Chase Format" --name "Chase New Format"
+   trackit format update "Chase Format" --account "Wells Fargo"  # Reassign to different account
+
+   # Delete a CSV format
+   trackit format delete "Old Format"
+   ```
+
+**Note**: To delete an account, you must first delete or reassign all its transactions and CSV formats. This prevents accidental data loss.
+
 ## Commands
 
 ### Account Management
 
 - `trackit account create <name> [--bank <bank_name>]` - Create a new account
 - `trackit account list` - List all accounts
+- `trackit account rename <name_or_id> <new_name> [--bank <bank_name>]` - Rename an account
+- `trackit account delete <name_or_id>` - Delete an account (only if no transactions/formats)
 
 ### CSV Format Management
 
@@ -110,6 +137,8 @@ pip install -e .
 - `trackit format map <format_name> <csv_column> <db_field> [--required]` - Map CSV columns
 - `trackit format list [--account <name_or_id>]` - List CSV formats
 - `trackit format show <format_name>` - Show format details
+- `trackit format update <format_name> [--name <new_name>] [--account <account>]` - Update format name or account
+- `trackit format delete <format_name>` - Delete a CSV format
 
 ### Transaction Management
 
@@ -118,6 +147,8 @@ pip install -e .
 - `trackit view [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
 - `trackit categorize <transaction_id> [transaction_id ...] <category_path>` - Assign category to one or more transactions
 - `trackit notes <transaction_id> [<notes>] [--clear]` - Update transaction notes
+- `trackit transaction update <id> [--account <account>] [--date <date>] [--amount <amount>] [--description <desc>] [--reference <ref>] [--category <category>] [--notes <notes>]` - Update transaction fields
+- `trackit transaction delete <id>` - Delete a transaction
 
 **Note**: Account can be specified by name or ID in most commands. Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.
 

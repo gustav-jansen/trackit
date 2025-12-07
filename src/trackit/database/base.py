@@ -49,6 +49,56 @@ class Database(ABC):
         """List all accounts."""
         pass
 
+    @abstractmethod
+    def update_account_name(self, account_id: int, name: str, bank_name: Optional[str] = None) -> None:
+        """Update account name and optionally bank name.
+
+        Args:
+            account_id: Account ID to update
+            name: New account name
+            bank_name: Optional new bank name (if None, bank_name is not updated)
+
+        Raises:
+            ValueError: If account not found or name already exists
+        """
+        pass
+
+    @abstractmethod
+    def delete_account(self, account_id: int) -> None:
+        """Delete an account.
+
+        Args:
+            account_id: Account ID to delete
+
+        Raises:
+            ValueError: If account not found or has associated transactions/formats
+        """
+        pass
+
+    @abstractmethod
+    def get_account_transaction_count(self, account_id: int) -> int:
+        """Get count of transactions associated with an account.
+
+        Args:
+            account_id: Account ID
+
+        Returns:
+            Number of transactions
+        """
+        pass
+
+    @abstractmethod
+    def get_account_format_count(self, account_id: int) -> int:
+        """Get count of CSV formats associated with an account.
+
+        Args:
+            account_id: Account ID
+
+        Returns:
+            Number of CSV formats
+        """
+        pass
+
     # CSV Format operations
     @abstractmethod
     def create_csv_format(self, name: str, account_id: int) -> int:
@@ -81,6 +131,32 @@ class Database(ABC):
     @abstractmethod
     def get_column_mappings(self, format_id: int) -> list[CSVColumnMapping]:
         """Get all column mappings for a format."""
+        pass
+
+    @abstractmethod
+    def update_csv_format(self, format_id: int, name: Optional[str] = None, account_id: Optional[int] = None) -> None:
+        """Update CSV format fields.
+
+        Args:
+            format_id: Format ID to update
+            name: Optional new format name
+            account_id: Optional new account ID
+
+        Raises:
+            ValueError: If format not found or name already exists
+        """
+        pass
+
+    @abstractmethod
+    def delete_csv_format(self, format_id: int) -> None:
+        """Delete a CSV format.
+
+        Args:
+            format_id: Format ID to delete
+
+        Raises:
+            ValueError: If format not found
+        """
         pass
 
     # Category operations
@@ -147,6 +223,49 @@ class Database(ABC):
     @abstractmethod
     def update_transaction_notes(self, transaction_id: int, notes: Optional[str]) -> None:
         """Update transaction notes."""
+        pass
+
+    @abstractmethod
+    def update_transaction(
+        self,
+        transaction_id: int,
+        account_id: Optional[int] = None,
+        date: Optional[date] = None,
+        amount: Optional[Decimal] = None,
+        description: Optional[str] = None,
+        reference_number: Optional[str] = None,
+        category_id: Optional[int] = None,
+        notes: Optional[str] = None,
+        update_category: bool = False,
+    ) -> None:
+        """Update transaction fields.
+
+        Args:
+            transaction_id: Transaction ID to update
+            account_id: Optional new account ID
+            date: Optional new date
+            amount: Optional new amount
+            description: Optional new description
+            reference_number: Optional new reference number
+            category_id: Optional new category ID
+            notes: Optional new notes
+            update_category: If True, update category_id even if it's None (to clear it)
+
+        Raises:
+            ValueError: If transaction not found
+        """
+        pass
+
+    @abstractmethod
+    def delete_transaction(self, transaction_id: int) -> None:
+        """Delete a transaction.
+
+        Args:
+            transaction_id: Transaction ID to delete
+
+        Raises:
+            ValueError: If transaction not found
+        """
         pass
 
     @abstractmethod

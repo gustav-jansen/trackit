@@ -142,6 +142,84 @@ def show_format(ctx, format_name: str):
             click.echo(f"  {m.csv_column_name} -> {m.db_field_name}{req}")
 
 
+@format_group.command("update")
+@click.argument("format_name")
+@click.option("--name", help="New format name")
+@click.option("--account", help="Account name or ID to reassign format to")
+@click.pass_context
+def update_format(ctx, format_name: str, name: str | None, account: str | None) -> None:
+    """Update a CSV format.
+
+    Updates only the fields that are provided.
+
+    Examples:
+        trackit format update "Chase Format" --name "Chase New Format"
+        trackit format update "Chase Format" --account "Wells Fargo"
+        trackit format update "Chase Format" --name "New Name" --account "Chase"
+    """
+    db = ctx.obj["db"]
+    service = CSVFormatService(db)
+    account_service = AccountService(db)
+
+    # Get format
+    fmt = service.get_format_by_name(format_name)
+    if fmt is None:
+        click.echo(f"Error: CSV format '{format_name}' not found", err=True)
+        ctx.exit(1)
+
+    # Resolve account if provided
+    account_id = None
+    if account is not None:
+        try:
+            from trackit.utils.account_resolver import resolve_account
+            account_id = resolve_account(account_service, account)
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
+            ctx.exit(1)
+
+    try:
+        service.update_format(format_id=fmt.id, name=name, account_id=account_id)
+        click.echo(f"Updated format '{format_name}'")
+        if name is not None:
+            click.echo(f"  New name: '{name}'")
+        if account is not None:
+            click.echo(f"  Reassigned to account: '{account}'")
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+
+
+@format_group.command("delete")
+@click.argument("format_name")
+@click.pass_context
+def delete_format(ctx, format_name: str) -> None:
+    """Delete a CSV format.
+
+    Examples:
+        trackit format delete "Chase Format"
+    """
+    db = ctx.obj["db"]
+    service = CSVFormatService(db)
+
+    # Get format
+    fmt = service.get_format_by_name(format_name)
+    if fmt is None:
+        click.echo(f"Error: CSV format '{format_name}' not found", err=True)
+        ctx.exit(1)
+
+    # Confirm deletion
+    if not click.confirm(f"Are you sure you want to delete format '{format_name}' (ID: {fmt.id})?"):
+        click.echo("Deletion cancelled.")
+        return
+
+    try:
+        service.delete_format(fmt.id)
+        click.echo(f"Deleted format '{format_name}'")
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        ctx.exit(1)
+
+
 def register_commands(cli):
     """Register format commands with main CLI."""
     cli.add_command(format_group, name="format")
