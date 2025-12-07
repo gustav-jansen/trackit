@@ -158,11 +158,17 @@ class TestCSVFormat:
             name="Test Format",
             account_id=1,
             created_at=datetime.now(UTC),
+            is_debit_credit_format=False,
+            negate_debit=False,
+            negate_credit=False,
         )
         assert csv_format.id == 1
         assert csv_format.name == "Test Format"
         assert csv_format.account_id == 1
         assert isinstance(csv_format.created_at, datetime)
+        assert csv_format.is_debit_credit_format is False
+        assert csv_format.negate_debit is False
+        assert csv_format.negate_credit is False
 
 
 class TestCSVColumnMapping:

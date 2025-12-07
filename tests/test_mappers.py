@@ -142,6 +142,9 @@ class TestCSVFormatMapper:
             name="Test Format",
             account_id=1,
             created_at=datetime.now(UTC),
+            is_debit_credit_format=False,
+            negate_debit=False,
+            negate_credit=False,
         )
         domain_format = csv_format_to_domain(orm_format)
 
@@ -150,6 +153,9 @@ class TestCSVFormatMapper:
         assert domain_format.name == "Test Format"
         assert domain_format.account_id == 1
         assert domain_format.created_at == orm_format.created_at
+        assert domain_format.is_debit_credit_format is False
+        assert domain_format.negate_debit is False
+        assert domain_format.negate_credit is False
 
 
 class TestCSVColumnMappingMapper:

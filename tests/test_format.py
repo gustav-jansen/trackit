@@ -395,3 +395,273 @@ def test_format_delete_not_found(cli_runner, temp_db):
     assert result.exit_code == 1
     assert "not found" in result.output.lower()
 
+
+def test_format_create_debit_credit(cli_runner, temp_db, sample_account):
+    """Test creating a format with debit/credit format enabled."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "create",
+            "Debit Credit Format",
+            "--account",
+            str(sample_account.id),
+            "--debit-credit-format",
+            "--negate-debit",
+            "--negate-credit",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Created CSV format" in result.output
+    assert "Debit/Credit format enabled" in result.output
+    assert "Debit values will be negated" in result.output
+    assert "Credit values will be negated" in result.output
+
+
+def test_format_show_debit_credit(cli_runner, temp_db, sample_debit_credit_format):
+    """Test showing debit/credit format details."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "show",
+            "Test Debit Credit Format",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Debit/Credit Format" in result.output
+    assert "Negate Debit: Yes" in result.output
+    assert "Negate Credit: Yes" in result.output
+
+
+def test_format_list_debit_credit(cli_runner, temp_db, sample_debit_credit_format):
+    """Test listing formats shows debit/credit format info."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "list",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Test Debit Credit Format" in result.output
+    assert "Type: Debit/Credit Format" in result.output
+    assert "Debit values will be negated" in result.output
+    assert "Credit values will be negated" in result.output
+
+
+def test_format_map_debit_credit(cli_runner, temp_db, sample_account):
+    """Test mapping debit and credit columns."""
+    # Create debit/credit format
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "create",
+            "Debit Credit Format",
+            "--account",
+            str(sample_account.id),
+            "--debit-credit-format",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Map debit column
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "map",
+            "Debit Credit Format",
+            "Debit",
+            "debit",
+            "--required",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Map credit column
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "map",
+            "Debit Credit Format",
+            "Credit",
+            "credit",
+            "--required",
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_format_map_amount_to_debit_credit_format_fails(cli_runner, temp_db, sample_account):
+    """Test that mapping amount to debit/credit format fails."""
+    # Create debit/credit format
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "create",
+            "Debit Credit Format",
+            "--account",
+            str(sample_account.id),
+            "--debit-credit-format",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Try to map amount - should fail
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "map",
+            "Debit Credit Format",
+            "Amount",
+            "amount",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Cannot map 'amount' field for debit/credit format" in result.output
+
+
+def test_format_map_debit_to_regular_format_fails(cli_runner, temp_db, sample_account):
+    """Test that mapping debit/credit to regular format fails."""
+    # Create regular format
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "create",
+            "Regular Format",
+            "--account",
+            str(sample_account.id),
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Try to map debit - should fail
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "map",
+            "Regular Format",
+            "Debit",
+            "debit",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Cannot map 'debit' field for non-debit/credit format" in result.output
+
+
+def test_format_validate_debit_credit_missing_columns(cli_runner, temp_db, sample_account):
+    """Test validation of debit/credit format with missing columns."""
+    # Create debit/credit format
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "create",
+            "Debit Credit Format",
+            "--account",
+            str(sample_account.id),
+            "--debit-credit-format",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Only map date, missing debit and credit
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "map",
+            "Debit Credit Format",
+            "Date",
+            "date",
+            "--required",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Check validation
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "show",
+            "Debit Credit Format",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Valid: No" in result.output
+    assert "debit" in result.output.lower() or "credit" in result.output.lower()
+
+
+def test_format_update_debit_credit_flags(cli_runner, temp_db, sample_account):
+    """Test updating debit/credit format flags."""
+    # Create regular format
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "create",
+            "Test Format",
+            "--account",
+            str(sample_account.id),
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Update to enable debit/credit format
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "update",
+            "Test Format",
+            "--debit-credit-format",
+            "--negate-debit",
+            "--negate-credit",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "Debit/Credit format: enabled" in result.output
+    assert "Negate debit: enabled" in result.output
+    assert "Negate credit: enabled" in result.output
+

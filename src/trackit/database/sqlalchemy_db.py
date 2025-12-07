@@ -144,10 +144,23 @@ class SQLAlchemyDatabase(Database):
         return session.query(CSVFormat).filter(CSVFormat.account_id == account_id).count()
 
     # CSV Format operations
-    def create_csv_format(self, name: str, account_id: int) -> int:
+    def create_csv_format(
+        self,
+        name: str,
+        account_id: int,
+        is_debit_credit_format: bool = False,
+        negate_debit: bool = False,
+        negate_credit: bool = False,
+    ) -> int:
         """Create a new CSV format. Returns format ID."""
         session = self._get_session()
-        csv_format = CSVFormat(name=name, account_id=account_id)
+        csv_format = CSVFormat(
+            name=name,
+            account_id=account_id,
+            is_debit_credit_format=is_debit_credit_format,
+            negate_debit=negate_debit,
+            negate_credit=negate_credit,
+        )
         session.add(csv_format)
         session.commit()
         return csv_format.id
@@ -204,7 +217,15 @@ class SQLAlchemyDatabase(Database):
         )
         return [csv_column_mapping_to_domain(m) for m in mappings]
 
-    def update_csv_format(self, format_id: int, name: Optional[str] = None, account_id: Optional[int] = None) -> None:
+    def update_csv_format(
+        self,
+        format_id: int,
+        name: Optional[str] = None,
+        account_id: Optional[int] = None,
+        is_debit_credit_format: Optional[bool] = None,
+        negate_debit: Optional[bool] = None,
+        negate_credit: Optional[bool] = None,
+    ) -> None:
         """Update CSV format fields."""
         session = self._get_session()
         fmt = session.query(CSVFormat).filter(CSVFormat.id == format_id).first()
@@ -220,6 +241,15 @@ class SQLAlchemyDatabase(Database):
 
         if account_id is not None:
             fmt.account_id = account_id
+
+        if is_debit_credit_format is not None:
+            fmt.is_debit_credit_format = is_debit_credit_format
+
+        if negate_debit is not None:
+            fmt.negate_debit = negate_debit
+
+        if negate_credit is not None:
+            fmt.negate_credit = negate_credit
 
         session.commit()
 

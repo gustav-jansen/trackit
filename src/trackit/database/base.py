@@ -101,8 +101,23 @@ class Database(ABC):
 
     # CSV Format operations
     @abstractmethod
-    def create_csv_format(self, name: str, account_id: int) -> int:
-        """Create a new CSV format. Returns format ID."""
+    def create_csv_format(
+        self,
+        name: str,
+        account_id: int,
+        is_debit_credit_format: bool = False,
+        negate_debit: bool = False,
+        negate_credit: bool = False,
+    ) -> int:
+        """Create a new CSV format. Returns format ID.
+
+        Args:
+            name: Format name
+            account_id: Associated account ID
+            is_debit_credit_format: Whether this format uses separate debit/credit columns
+            negate_debit: Whether to negate debit values during import
+            negate_credit: Whether to negate credit values during import
+        """
         pass
 
     @abstractmethod
@@ -134,13 +149,24 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def update_csv_format(self, format_id: int, name: Optional[str] = None, account_id: Optional[int] = None) -> None:
+    def update_csv_format(
+        self,
+        format_id: int,
+        name: Optional[str] = None,
+        account_id: Optional[int] = None,
+        is_debit_credit_format: Optional[bool] = None,
+        negate_debit: Optional[bool] = None,
+        negate_credit: Optional[bool] = None,
+    ) -> None:
         """Update CSV format fields.
 
         Args:
             format_id: Format ID to update
             name: Optional new format name
             account_id: Optional new account ID
+            is_debit_credit_format: Optional flag to enable/disable debit/credit format
+            negate_debit: Optional flag to enable/disable debit negation
+            negate_credit: Optional flag to enable/disable credit negation
 
         Raises:
             ValueError: If format not found or name already exists

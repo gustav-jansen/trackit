@@ -259,3 +259,180 @@ def test_import_skipped_details_reported(cli_runner, temp_db, sample_account, sa
     assert "Description:" in result.output or "Grocery Store" in result.output
     assert "Amount:" in result.output or "-50.00" in result.output
 
+
+def test_import_debit_credit_format(cli_runner, temp_db, sample_account, sample_debit_credit_format, fixtures_dir):
+    """Test successful CSV import with debit/credit format."""
+    csv_file = fixtures_dir / "sample_transactions_debit_credit.csv"
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "import",
+            str(csv_file),
+            "--format",
+            "Test Debit Credit Format",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Import complete" in result.output
+    assert "Imported:" in result.output
+    assert "5" in result.output  # Should import 5 transactions
+
+
+def test_import_debit_credit_amounts(cli_runner, temp_db, sample_account, sample_debit_credit_format, fixtures_dir, transaction_service):
+    """Test that debit/credit amounts are correctly converted."""
+    from datetime import date
+    from decimal import Decimal
+
+    csv_file = fixtures_dir / "sample_transactions_debit_credit.csv"
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "import",
+            str(csv_file),
+            "--format",
+            "Test Debit Credit Format",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+    # Check that amounts were correctly converted:
+    # Debit 19.74 (positive) -> -19.74 (negative) with negate_debit=True
+    # Credit -1482.17 (negative) -> 1482.17 (positive) with negate_credit=True
+    transactions = transaction_service.list_transactions()
+
+    # Find the Microsoft transaction (debit)
+    microsoft_txn = next((t for t in transactions if "Microsoft" in (t.description or "")), None)
+    assert microsoft_txn is not None
+    assert microsoft_txn.amount == Decimal("-19.74")
+
+    # Find the payment transaction (credit)
+    payment_txn = next((t for t in transactions if "ONLINE PAYMENT" in (t.description or "")), None)
+    assert payment_txn is not None
+    assert payment_txn.amount == Decimal("1482.17")
+
+
+def test_import_debit_credit_both_empty(cli_runner, temp_db, sample_account, sample_debit_credit_format, fixtures_dir):
+    """Test import error when both debit and credit are empty."""
+    import tempfile
+    import csv
+
+    # Create a CSV with a row where both debit and credit are empty
+    csv_content = [
+        ["Status", "Date", "Description", "Debit", "Credit", "Member Name"],
+        ["Cleared", "11/26/2025", "Test Transaction", "", "", "GUSTAV R JANSEN"],
+    ]
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        writer = csv.writer(f)
+        writer.writerows(csv_content)
+        temp_csv = f.name
+
+    try:
+        result = cli_runner.invoke(
+            cli,
+            [
+                "--db-path",
+                temp_db.database_path,
+                "import",
+                temp_csv,
+                "--format",
+                "Test Debit Credit Format",
+            ],
+        )
+
+        assert result.exit_code == 0  # Import completes but with error
+        assert "Missing both debit and credit values" in result.output
+        assert "exactly one required" in result.output
+    finally:
+        import os
+        if os.path.exists(temp_csv):
+            os.unlink(temp_csv)
+
+
+def test_import_debit_credit_both_filled(cli_runner, temp_db, sample_account, sample_debit_credit_format, fixtures_dir):
+    """Test import error when both debit and credit have values."""
+    import tempfile
+    import csv
+
+    # Create a CSV with a row where both debit and credit have values
+    csv_content = [
+        ["Status", "Date", "Description", "Debit", "Credit", "Member Name"],
+        ["Cleared", "11/26/2025", "Test Transaction", "10.00", "-20.00", "GUSTAV R JANSEN"],
+    ]
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        writer = csv.writer(f)
+        writer.writerows(csv_content)
+        temp_csv = f.name
+
+    try:
+        result = cli_runner.invoke(
+            cli,
+            [
+                "--db-path",
+                temp_db.database_path,
+                "import",
+                temp_csv,
+                "--format",
+                "Test Debit Credit Format",
+            ],
+        )
+
+        assert result.exit_code == 0  # Import completes but with error
+        assert "Both debit and credit have values" in result.output
+        assert "exactly one required" in result.output
+    finally:
+        import os
+        if os.path.exists(temp_csv):
+            os.unlink(temp_csv)
+
+
+def test_import_debit_credit_unique_id_generation(cli_runner, temp_db, sample_account, sample_debit_credit_format, fixtures_dir, transaction_service):
+    """Test unique ID generation with debit/credit format."""
+    from trackit.domain.csv_import import CSVImportService
+    from datetime import date
+    from decimal import Decimal
+
+    csv_file = fixtures_dir / "sample_transactions_debit_credit.csv"
+
+    # Import once
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "import",
+            str(csv_file),
+            "--format",
+            "Test Debit Credit Format",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Imported: 5" in result.output
+
+    # Import again - should skip duplicates
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "import",
+            str(csv_file),
+            "--format",
+            "Test Debit Credit Format",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Skipped:" in result.output
+    assert "5" in result.output  # Should skip 5 duplicates
+

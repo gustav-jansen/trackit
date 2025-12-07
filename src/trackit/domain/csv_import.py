@@ -107,9 +107,14 @@ class CSVImportService:
             if csv_columns is None:
                 raise ValueError("CSV file has no columns")
 
-            # Required fields are date and amount (unique_id is optional)
+            # Determine required columns based on format type
+            if fmt.is_debit_credit_format:
+                required_fields = {"date", "debit", "credit"}
+            else:
+                required_fields = {"date", "amount"}
+
             required_csv_columns = {
-                col for col, field in column_map.items() if field in {"date", "amount"}
+                col for col, field in column_map.items() if field in required_fields
             }
             missing_columns = required_csv_columns - set(csv_columns)
             if missing_columns:
@@ -139,23 +144,60 @@ class CSVImportService:
                         errors.append(f"Row {row_num}: Missing date")
                         continue
 
-                    amount_str = values.get("amount")
-                    if not amount_str:
-                        errors.append(f"Row {row_num}: Missing amount")
-                        continue
-
-                    # Parse date and amount
+                    # Parse date
                     try:
                         txn_date = parse_date(date_str)
                     except ValueError as e:
                         errors.append(f"Row {row_num}: {e}")
                         continue
 
-                    try:
-                        amount = parse_amount(amount_str)
-                    except ValueError as e:
-                        errors.append(f"Row {row_num}: {e}")
-                        continue
+                    # Handle amount based on format type
+                    if fmt.is_debit_credit_format:
+                        # Debit/credit format: read from both columns
+                        debit_str = values.get("debit")
+                        credit_str = values.get("credit")
+
+                        # Check that exactly one has a value
+                        has_debit = debit_str and debit_str.strip()
+                        has_credit = credit_str and credit_str.strip()
+
+                        if not has_debit and not has_credit:
+                            errors.append(f"Row {row_num}: Missing both debit and credit values (exactly one required)")
+                            continue
+
+                        if has_debit and has_credit:
+                            errors.append(f"Row {row_num}: Both debit and credit have values (exactly one required)")
+                            continue
+
+                        # Parse the value that exists
+                        if has_debit:
+                            try:
+                                debit_amount = parse_amount(debit_str)
+                                # Apply negation if configured
+                                amount = -debit_amount if fmt.negate_debit else debit_amount
+                            except ValueError as e:
+                                errors.append(f"Row {row_num}: Invalid debit value: {e}")
+                                continue
+                        else:  # has_credit
+                            try:
+                                credit_amount = parse_amount(credit_str)
+                                # Apply negation if configured
+                                amount = -credit_amount if fmt.negate_credit else credit_amount
+                            except ValueError as e:
+                                errors.append(f"Row {row_num}: Invalid credit value: {e}")
+                                continue
+                    else:
+                        # Regular format: read from amount column
+                        amount_str = values.get("amount")
+                        if not amount_str:
+                            errors.append(f"Row {row_num}: Missing amount")
+                            continue
+
+                        try:
+                            amount = parse_amount(amount_str)
+                        except ValueError as e:
+                            errors.append(f"Row {row_num}: {e}")
+                            continue
 
                     # If unique_id is not provided, generate it from date, description, and amount
                     if not unique_id:
