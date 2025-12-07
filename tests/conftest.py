@@ -124,6 +124,27 @@ def sample_csv_format_no_id(csv_format_service, sample_account):
 
 
 @pytest.fixture
+def sample_debit_credit_format(csv_format_service, sample_account):
+    """Create a sample debit/credit CSV format with mappings."""
+    format_id = csv_format_service.create_format(
+        name="Test Debit Credit Format",
+        account_id=sample_account.id,
+        is_debit_credit_format=True,
+        negate_debit=True,
+        negate_credit=True,
+    )
+
+    # Add required mappings for debit/credit format
+    csv_format_service.add_mapping(format_id, "Date", "date", is_required=True)
+    csv_format_service.add_mapping(format_id, "Debit", "debit", is_required=True)
+    csv_format_service.add_mapping(format_id, "Credit", "credit", is_required=True)
+    csv_format_service.add_mapping(format_id, "Description", "description")
+    csv_format_service.add_mapping(format_id, "Member Name", "reference_number")
+
+    return csv_format_service.get_format(format_id)
+
+
+@pytest.fixture
 def cli_runner():
     """Create a Click CLI test runner."""
     from click.testing import CliRunner

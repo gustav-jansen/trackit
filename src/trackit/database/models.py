@@ -44,6 +44,9 @@ class CSVFormat(Base):
     name = Column(String, nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    is_debit_credit_format = Column(Boolean, default=False, nullable=False)
+    negate_debit = Column(Boolean, default=False, nullable=False)
+    negate_credit = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     account = relationship("Account", back_populates="csv_formats")

@@ -14,8 +14,28 @@ def format_group():
 @format_group.command("create")
 @click.argument("name")
 @click.option("--account", required=True, help="Account name or ID")
+@click.option(
+    "--debit-credit-format",
+    is_flag=True,
+    default=False,
+    help="Use separate debit and credit columns instead of a single amount column",
+)
+@click.option(
+    "--negate-debit",
+    is_flag=True,
+    default=False,
+    help="Negate debit values during import (e.g., positive debit -> negative amount)",
+)
+@click.option(
+    "--negate-credit",
+    is_flag=True,
+    default=False,
+    help="Negate credit values during import (e.g., negative credit -> positive amount)",
+)
 @click.pass_context
-def create_format(ctx, name: str, account: str):
+def create_format(
+    ctx, name: str, account: str, debit_credit_format: bool, negate_debit: bool, negate_credit: bool
+):
     """Create a new CSV format."""
     db = ctx.obj["db"]
     service = CSVFormatService(db)
@@ -30,8 +50,20 @@ def create_format(ctx, name: str, account: str):
         ctx.exit(1)
 
     try:
-        format_id = service.create_format(name=name, account_id=account_id)
+        format_id = service.create_format(
+            name=name,
+            account_id=account_id,
+            is_debit_credit_format=debit_credit_format,
+            negate_debit=negate_debit,
+            negate_credit=negate_credit,
+        )
         click.echo(f"Created CSV format '{name}' (ID: {format_id})")
+        if debit_credit_format:
+            click.echo("Debit/Credit format enabled")
+            if negate_debit:
+                click.echo("  Debit values will be negated")
+            if negate_credit:
+                click.echo("  Credit values will be negated")
         click.echo("Use 'format map' to add column mappings.")
     except ValueError as e:
         click.echo(f"Error: {e}", err=True)
@@ -101,6 +133,12 @@ def list_formats(ctx, account):
 
         status = "✓" if is_valid else "✗"
         click.echo(f"{status} {fmt.name} (ID: {fmt.id}, Account: {fmt.account_id})")
+        if fmt.is_debit_credit_format:
+            click.echo("  Type: Debit/Credit Format")
+            if fmt.negate_debit:
+                click.echo("    Debit values will be negated")
+            if fmt.negate_credit:
+                click.echo("    Credit values will be negated")
         if not is_valid:
             click.echo(f"  Missing required fields: {', '.join(missing)}")
         if mappings:
@@ -129,6 +167,10 @@ def show_format(ctx, format_name: str):
     click.echo(f"\nFormat: {fmt.name}")
     click.echo(f"ID: {fmt.id}")
     click.echo(f"Account ID: {fmt.account_id}")
+    click.echo(f"Type: {'Debit/Credit Format' if fmt.is_debit_credit_format else 'Standard Format'}")
+    if fmt.is_debit_credit_format:
+        click.echo(f"  Negate Debit: {'Yes' if fmt.negate_debit else 'No'}")
+        click.echo(f"  Negate Credit: {'Yes' if fmt.negate_credit else 'No'}")
     click.echo(f"Valid: {'Yes' if is_valid else 'No'}")
     if not is_valid:
         click.echo(f"Missing required fields: {', '.join(missing)}")
@@ -146,8 +188,31 @@ def show_format(ctx, format_name: str):
 @click.argument("format_name")
 @click.option("--name", help="New format name")
 @click.option("--account", help="Account name or ID to reassign format to")
+@click.option(
+    "--debit-credit-format/--no-debit-credit-format",
+    default=None,
+    help="Enable or disable debit/credit format",
+)
+@click.option(
+    "--negate-debit/--no-negate-debit",
+    default=None,
+    help="Enable or disable debit negation",
+)
+@click.option(
+    "--negate-credit/--no-negate-credit",
+    default=None,
+    help="Enable or disable credit negation",
+)
 @click.pass_context
-def update_format(ctx, format_name: str, name: str | None, account: str | None) -> None:
+def update_format(
+    ctx,
+    format_name: str,
+    name: str | None,
+    account: str | None,
+    debit_credit_format: bool | None,
+    negate_debit: bool | None,
+    negate_credit: bool | None,
+) -> None:
     """Update a CSV format.
 
     Updates only the fields that are provided.
@@ -178,12 +243,25 @@ def update_format(ctx, format_name: str, name: str | None, account: str | None) 
             ctx.exit(1)
 
     try:
-        service.update_format(format_id=fmt.id, name=name, account_id=account_id)
+        service.update_format(
+            format_id=fmt.id,
+            name=name,
+            account_id=account_id,
+            is_debit_credit_format=debit_credit_format,
+            negate_debit=negate_debit,
+            negate_credit=negate_credit,
+        )
         click.echo(f"Updated format '{format_name}'")
         if name is not None:
             click.echo(f"  New name: '{name}'")
         if account is not None:
             click.echo(f"  Reassigned to account: '{account}'")
+        if debit_credit_format is not None:
+            click.echo(f"  Debit/Credit format: {'enabled' if debit_credit_format else 'disabled'}")
+        if negate_debit is not None:
+            click.echo(f"  Negate debit: {'enabled' if negate_debit else 'disabled'}")
+        if negate_credit is not None:
+            click.echo(f"  Negate credit: {'enabled' if negate_credit else 'disabled'}")
     except ValueError as e:
         click.echo(f"Error: {e}", err=True)
         ctx.exit(1)

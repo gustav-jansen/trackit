@@ -19,12 +19,22 @@ class CSVFormatService:
         """
         self.db = db
 
-    def create_format(self, name: str, account_id: int) -> int:
+    def create_format(
+        self,
+        name: str,
+        account_id: int,
+        is_debit_credit_format: bool = False,
+        negate_debit: bool = False,
+        negate_credit: bool = False,
+    ) -> int:
         """Create a new CSV format.
 
         Args:
             name: Format name
             account_id: Associated account ID
+            is_debit_credit_format: Whether this format uses separate debit/credit columns
+            negate_debit: Whether to negate debit values during import
+            negate_credit: Whether to negate credit values during import
 
         Returns:
             Format ID
@@ -42,7 +52,13 @@ class CSVFormatService:
         if existing is not None:
             raise ValueError(f"CSV format with name '{name}' already exists")
 
-        return self.db.create_csv_format(name=name, account_id=account_id)
+        return self.db.create_csv_format(
+            name=name,
+            account_id=account_id,
+            is_debit_credit_format=is_debit_credit_format,
+            negate_debit=negate_debit,
+            negate_credit=negate_credit,
+        )
 
     def get_format(self, format_id: int) -> Optional[CSVFormatEntity]:
         """Get CSV format by ID.
@@ -107,12 +123,31 @@ class CSVFormatService:
             "description",
             "reference_number",
             "account_name",
+            "debit",
+            "credit",
         }
         if db_field_name not in valid_fields:
             raise ValueError(
                 f"Invalid db_field_name '{db_field_name}'. "
                 f"Must be one of: {', '.join(sorted(valid_fields))}"
             )
+
+        # Check if format is debit/credit format and validate accordingly
+        fmt = self.db.get_csv_format(format_id)
+        if fmt.is_debit_credit_format:
+            # For debit/credit formats, amount should not be mapped
+            if db_field_name == "amount":
+                raise ValueError(
+                    "Cannot map 'amount' field for debit/credit format. "
+                    "Use 'debit' and 'credit' fields instead."
+                )
+        else:
+            # For regular formats, debit and credit should not be mapped
+            if db_field_name in ("debit", "credit"):
+                raise ValueError(
+                    f"Cannot map '{db_field_name}' field for non-debit/credit format. "
+                    "Use 'amount' field instead, or create format with --debit-credit-format flag."
+                )
 
         return self.db.add_column_mapping(
             format_id=format_id,
@@ -147,16 +182,32 @@ class CSVFormatService:
             unique_id is optional - if not provided, it will be generated from
             date, description, and amount.
         """
+        fmt = self.db.get_csv_format(format_id)
+        if fmt is None:
+            return (False, ["format not found"])
+
         mappings = self.get_mappings(format_id)
         mapped_fields = {m.db_field_name for m in mappings}
 
-        required_fields = {"date", "amount"}
-        missing = required_fields - mapped_fields
+        if fmt.is_debit_credit_format:
+            # For debit/credit formats, require date, debit, and credit
+            required_fields = {"date", "debit", "credit"}
+            missing = required_fields - mapped_fields
+        else:
+            # For regular formats, require date and amount
+            required_fields = {"date", "amount"}
+            missing = required_fields - mapped_fields
 
         return (len(missing) == 0, list(missing))
 
     def update_format(
-        self, format_id: int, name: Optional[str] = None, account_id: Optional[int] = None
+        self,
+        format_id: int,
+        name: Optional[str] = None,
+        account_id: Optional[int] = None,
+        is_debit_credit_format: Optional[bool] = None,
+        negate_debit: Optional[bool] = None,
+        negate_credit: Optional[bool] = None,
     ) -> None:
         """Update CSV format fields.
 
@@ -164,6 +215,9 @@ class CSVFormatService:
             format_id: Format ID to update
             name: Optional new format name
             account_id: Optional new account ID
+            is_debit_credit_format: Optional flag to enable/disable debit/credit format
+            negate_debit: Optional flag to enable/disable debit negation
+            negate_credit: Optional flag to enable/disable credit negation
 
         Raises:
             ValueError: If format not found, name already exists, or account doesn't exist
@@ -185,7 +239,14 @@ class CSVFormatService:
             if account is None:
                 raise ValueError(f"Account {account_id} not found")
 
-        self.db.update_csv_format(format_id=format_id, name=name, account_id=account_id)
+        self.db.update_csv_format(
+            format_id=format_id,
+            name=name,
+            account_id=account_id,
+            is_debit_credit_format=is_debit_credit_format,
+            negate_debit=negate_debit,
+            negate_credit=negate_credit,
+        )
 
     def delete_format(self, format_id: int) -> None:
         """Delete a CSV format.

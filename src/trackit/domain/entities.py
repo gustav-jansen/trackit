@@ -55,6 +55,9 @@ class CSVFormat:
     name: str
     account_id: int
     created_at: datetime
+    is_debit_credit_format: bool = False
+    negate_debit: bool = False
+    negate_credit: bool = False
 
 
 @dataclass(frozen=True)

@@ -211,6 +211,51 @@ trackit format map "Bank Format" "Description" description  # Required when uniq
 
 The account is automatically determined from the format's associated account, so you don't need to map `account_name` from the CSV.
 
+### Debit/Credit Format
+
+Some banks export CSV files where transaction amounts are split into separate `Debit` and `Credit` columns instead of a single `Amount` column. Trackit supports this format with configurable negation options.
+
+**Creating a debit/credit format**:
+```bash
+trackit format create "Credit Card Format" --account "My Credit Card" \
+  --debit-credit-format \
+  --negate-debit \
+  --negate-credit
+```
+
+**Mapping debit/credit columns**:
+```bash
+trackit format map "Credit Card Format" "Date" date --required
+trackit format map "Credit Card Format" "Debit" debit --required
+trackit format map "Credit Card Format" "Credit" credit --required
+trackit format map "Credit Card Format" "Description" description
+```
+
+**How it works**:
+- Each row must have exactly one value in either the `Debit` or `Credit` column (not both, not neither)
+- The `--negate-debit` flag negates debit values (e.g., positive debit `19.74` → negative amount `-19.74`)
+- The `--negate-credit` flag negates credit values (e.g., negative credit `-1482.17` → positive amount `1482.17`)
+- The final amount stored in the database is calculated from whichever column has a value, with negation applied if configured
+
+**Example CSV format**:
+```csv
+Status,Date,Description,Debit,Credit,Member Name
+Cleared,11/26/2025,"Microsoft*One Month Membe425-6816830 WA",19.74,,GUSTAV R JANSEN
+Cleared,11/19/2025,"ONLINE PAYMENT, THANK YOU",,-1482.17,GUSTAV R JANSEN
+```
+
+With `--negate-debit` and `--negate-credit` enabled:
+- First row: Debit `19.74` → stored as `-19.74` (charge)
+- Second row: Credit `-1482.17` → stored as `1482.17` (payment)
+
+**Updating format flags**:
+```bash
+trackit format update "Credit Card Format" --negate-debit  # Enable debit negation
+trackit format update "Credit Card Format" --no-negate-debit  # Disable debit negation
+```
+
+**Note**: Debit/credit format and regular amount format are mutually exclusive. You cannot map both `amount` and `debit`/`credit` fields in the same format.
+
 ## Category Hierarchy
 
 Categories support unlimited depth. Use `>` to separate levels in category paths:

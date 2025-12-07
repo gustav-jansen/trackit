@@ -57,6 +57,9 @@ def csv_format_to_domain(orm_format: ORMCSVFormat) -> domain.CSVFormat:
         name=orm_format.name,
         account_id=orm_format.account_id,
         created_at=orm_format.created_at,
+        is_debit_credit_format=orm_format.is_debit_credit_format,
+        negate_debit=orm_format.negate_debit,
+        negate_credit=orm_format.negate_credit,
     )
 
 
