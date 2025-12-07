@@ -160,7 +160,24 @@ pip install -e .
 
 ### Analysis
 
-- `trackit summary [--start-date <date>] [--end-date <date>] [--category <path>]` - Show category summary
+- `trackit summary [--start-date <date>] [--end-date <date>] [--category <path>] [--include-transfers] [--expand]` - Show category summary
+
+The summary command displays category totals in a single "Total" column (net total: income + expenses). By default, it shows top-level categories. Use `--expand` to show the full category tree with indented subtotals for each category level.
+
+**Examples:**
+```bash
+# Basic summary showing top-level categories
+trackit summary
+
+# Summary for a specific date range
+trackit summary --start-date 2024-01-01 --end-date 2024-01-31
+
+# Expanded view showing full category tree with indentation
+trackit summary --expand
+
+# Expanded view for a specific category
+trackit summary --category "Food & Dining" --expand
+```
 
 **Note**: Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.
 
@@ -303,6 +320,40 @@ The `transaction list` command automatically displays totals at the bottom:
 - Total expenses (sum of negative amounts)
 - Total income (sum of positive amounts)
 - Transaction count
+
+### Category Summary
+
+The `summary` command displays category totals in a single "Total" column showing the net total (income + expenses) for each category.
+
+**Default view** (top-level categories only):
+```
+Category Summary:
+--------------------------------------------------------------------------------
+Category                                          Total
+--------------------------------------------------------------------------------
+Food & Dining                                    -$1,234.56
+Transportation                                    -$567.89
+--------------------------------------------------------------------------------
+TOTAL                                            -$1,802.45
+```
+
+**Expanded view** (`--expand` flag) shows the full category tree with indentation:
+```
+Category Summary (Expanded):
+--------------------------------------------------------------------------------
+Category                                          Total
+--------------------------------------------------------------------------------
+Food & Dining                                    -$1,234.56
+  Groceries                                       -$800.00
+  Coffee & Snacks                                -$434.56
+Transportation                                    -$567.89
+  Gas                                             -$400.00
+  Parking                                         -$167.89
+--------------------------------------------------------------------------------
+TOTAL                                            -$1,802.45
+```
+
+In the expanded view, parent category totals include all transactions from that category and all its descendant categories. The overall total at the bottom is the sum of all transactions matching the applied filters (date range, category filter, include_transfers flag).
 
 ## Development
 
