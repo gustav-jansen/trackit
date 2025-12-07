@@ -1,6 +1,7 @@
 """CSV import domain service."""
 
 import csv
+import hashlib
 from typing import Any
 from datetime import date
 from decimal import Decimal
@@ -28,6 +29,23 @@ class CSVImportService:
         self.account_service = AccountService(db)
         self.format_service = CSVFormatService(db)
 
+    def _generate_unique_id(self, date: date, description: str, amount: Decimal) -> str:
+        """Generate a unique transaction ID from date, description, and amount.
+
+        Args:
+            date: Transaction date
+            description: Transaction description
+            amount: Transaction amount
+
+        Returns:
+            Deterministic hash-based unique ID
+        """
+        # Create a deterministic string from the transaction fields
+        # Use | as separator to avoid collisions
+        id_string = f"{date.isoformat()}|{description}|{amount}"
+        # Generate SHA256 hash and use first 32 characters (64 hex chars = 32 bytes)
+        return hashlib.sha256(id_string.encode()).hexdigest()
+
     def import_csv(self, csv_file_path: str, format_name: str) -> dict[str, Any]:
         """Import transactions from a CSV file.
 
@@ -39,6 +57,7 @@ class CSVImportService:
             Dict with import statistics:
             - imported: number of transactions imported
             - skipped: number of transactions skipped (duplicates)
+            - skipped_details: list of dicts with skipped transaction details
             - errors: list of error messages
 
         Raises:
@@ -68,7 +87,11 @@ class CSVImportService:
 
         imported = 0
         skipped = 0
+        skipped_details = []
         errors = []
+
+        # Check if unique_id is mapped
+        has_unique_id_mapping = "unique_id" in column_map.values()
 
         with open(csv_path, "r", encoding="utf-8-sig") as f:
             # Try to detect delimiter
@@ -84,9 +107,9 @@ class CSVImportService:
             if csv_columns is None:
                 raise ValueError("CSV file has no columns")
 
-            # Required fields are unique_id, date, amount (account_name comes from format's account_id)
+            # Required fields are date and amount (unique_id is optional)
             required_csv_columns = {
-                col for col, field in column_map.items() if field in {"unique_id", "date", "amount"}
+                col for col, field in column_map.items() if field in {"date", "amount"}
             }
             missing_columns = required_csv_columns - set(csv_columns)
             if missing_columns:
@@ -105,9 +128,9 @@ class CSVImportService:
                         else:
                             values[db_field] = None
 
-                    # Parse required fields
+                    # Get unique_id if mapped, otherwise generate it
                     unique_id = values.get("unique_id")
-                    if not unique_id:
+                    if not unique_id and has_unique_id_mapping:
                         errors.append(f"Row {row_num}: Missing unique_id")
                         continue
 
@@ -134,9 +157,19 @@ class CSVImportService:
                         errors.append(f"Row {row_num}: {e}")
                         continue
 
+                    # If unique_id is not provided, generate it from date, description, and amount
+                    if not unique_id:
+                        description = values.get("description")
+                        if not description:
+                            errors.append(
+                                f"Row {row_num}: Missing description (required when unique_id is not provided)"
+                            )
+                            continue
+                        unique_id = self._generate_unique_id(txn_date, description, amount)
+
                     # Use the account from the format (account_name is not read from CSV)
                     account_id = fmt.account_id
-                    
+
                     # Verify account still exists
                     account = self.account_service.get_account(account_id)
                     if account is None:
@@ -146,6 +179,15 @@ class CSVImportService:
                     # Check for duplicate
                     if self.db.transaction_exists(account_id, unique_id):
                         skipped += 1
+                        skipped_details.append({
+                            "row_num": row_num,
+                            "reason": "Duplicate transaction",
+                            "details": {
+                                "date": str(txn_date),
+                                "description": values.get("description", ""),
+                                "amount": str(amount),
+                            },
+                        })
                         continue
 
                     # Create transaction
@@ -168,6 +210,7 @@ class CSVImportService:
         return {
             "imported": imported,
             "skipped": skipped,
+            "skipped_details": skipped_details,
             "errors": errors,
         }
 

@@ -17,7 +17,17 @@ def import_csv(ctx, csv_file: str, format: str):
         result = service.import_csv(csv_file_path=csv_file, format_name=format)
         click.echo(f"\nImport complete:")
         click.echo(f"  Imported: {result['imported']} transactions")
-        click.echo(f"  Skipped: {result['skipped']} duplicates")
+        if result['skipped'] > 0:
+            click.echo(f"  Skipped: {result['skipped']} duplicates")
+            # Show details for each skipped transaction
+            for skipped in result.get('skipped_details', []):
+                details = skipped['details']
+                click.echo(
+                    f"    Row {skipped['row_num']}: Skipped duplicate - "
+                    f"Date: {details['date']}, "
+                    f"Description: {details['description']}, "
+                    f"Amount: {details['amount']}"
+                )
         if result["errors"]:
             click.echo(f"  Errors: {len(result['errors'])}")
             for error in result["errors"]:

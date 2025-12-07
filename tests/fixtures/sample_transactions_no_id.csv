@@ -1,0 +1,6 @@
+Transaction Date,Post Date,Description,Category,Type,Amount,Memo
+2024-01-15,2024-01-15,Grocery Store,Food,Debit,-50.00,REF001
+2024-01-16,2024-01-16,Coffee Shop,Food,Debit,-25.50,REF002
+2024-01-17,2024-01-17,Salary Payment,Income,Credit,1000.00,REF003
+2024-01-18,2024-01-18,Restaurant,Food,Debit,-15.75,REF004
+2024-01-19,2024-01-19,Gas Station,Transportation,Debit,-100.00,REF005

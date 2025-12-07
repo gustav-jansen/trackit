@@ -183,13 +183,31 @@ trackit --db-path /path/to/custom.db account list
 ## CSV Import Format
 
 When creating a CSV format, you need to map at least these required fields:
-- `unique_id` - Unique transaction identifier (prevents duplicates)
 - `date` - Transaction date
 - `amount` - Transaction amount (supports various formats: `$123.45`, `-123.45`, `(123.45)`, etc.)
 
 Optional fields:
-- `description` - Transaction description
+- `unique_id` - Unique transaction identifier (prevents duplicates). If not provided, a unique ID will be automatically generated from the date, description, and amount fields.
+- `description` - Transaction description (required if `unique_id` is not mapped, as it's used to generate the unique ID)
 - `reference_number` - Reference number
+
+**Note**: If your CSV file doesn't have a unique transaction ID column, you can omit the `unique_id` mapping. The system will automatically generate a unique ID based on the combination of date, description, and amount. In this case, the `description` field becomes required to ensure reliable duplicate detection.
+
+**Example formats**:
+
+With unique_id:
+```bash
+trackit format map "Chase Format" "Transaction ID" unique_id --required
+trackit format map "Chase Format" "Date" date --required
+trackit format map "Chase Format" "Amount" amount --required
+```
+
+Without unique_id (auto-generated):
+```bash
+trackit format map "Bank Format" "Transaction Date" date --required
+trackit format map "Bank Format" "Amount" amount --required
+trackit format map "Bank Format" "Description" description  # Required when unique_id not mapped
+```
 
 The account is automatically determined from the format's associated account, so you don't need to map `account_name` from the CSV.
 
