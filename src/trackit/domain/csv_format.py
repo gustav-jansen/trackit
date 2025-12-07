@@ -144,11 +144,13 @@ class CSVFormatService:
         Note:
             account_name is not required as it comes from the format's account_id,
             not from the CSV file.
+            unique_id is optional - if not provided, it will be generated from
+            date, description, and amount.
         """
         mappings = self.get_mappings(format_id)
         mapped_fields = {m.db_field_name for m in mappings}
 
-        required_fields = {"unique_id", "date", "amount"}
+        required_fields = {"date", "amount"}
         missing = required_fields - mapped_fields
 
         return (len(missing) == 0, list(missing))

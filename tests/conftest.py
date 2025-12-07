@@ -18,16 +18,16 @@ def temp_db():
     # Create a temporary file for the database
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
-    
+
     # Create database
     db = create_sqlite_database(database_path=db_path)
     # Store the path for tests that need it
     db.database_path = db_path
     db.connect()
     db.initialize_schema()
-    
+
     yield db
-    
+
     # Cleanup
     db.disconnect()
     if os.path.exists(db_path):
@@ -70,15 +70,15 @@ def sample_categories(category_service):
     """Initialize categories and return some sample category IDs."""
     # Initialize default categories
     from trackit.cli.commands.init_categories import INITIAL_CATEGORIES
-    
+
     category_ids = {}
-    
+
     # Create root categories first
     for category_name, parent_name in INITIAL_CATEGORIES:
         if parent_name is None:
             category_id = category_service.create_category(name=category_name, parent_path=None)
             category_ids[category_name] = category_id
-    
+
     # Create child categories
     for category_name, parent_name in INITIAL_CATEGORIES:
         if parent_name is not None:
@@ -86,7 +86,7 @@ def sample_categories(category_service):
                 name=category_name, parent_path=parent_name
             )
             category_ids[f"{parent_name} > {category_name}"] = category_id
-    
+
     return category_ids
 
 
@@ -96,14 +96,30 @@ def sample_csv_format(csv_format_service, sample_account):
     format_id = csv_format_service.create_format(
         name="Test Format", account_id=sample_account.id
     )
-    
+
     # Add required mappings
     csv_format_service.add_mapping(format_id, "Transaction ID", "unique_id", is_required=True)
     csv_format_service.add_mapping(format_id, "Date", "date", is_required=True)
     csv_format_service.add_mapping(format_id, "Amount", "amount", is_required=True)
     csv_format_service.add_mapping(format_id, "Description", "description")
     csv_format_service.add_mapping(format_id, "Reference", "reference_number")
-    
+
+    return csv_format_service.get_format(format_id)
+
+
+@pytest.fixture
+def sample_csv_format_no_id(csv_format_service, sample_account):
+    """Create a sample CSV format without unique_id mapping (for generated ID tests)."""
+    format_id = csv_format_service.create_format(
+        name="Test Format No ID", account_id=sample_account.id
+    )
+
+    # Add required mappings (no unique_id)
+    csv_format_service.add_mapping(format_id, "Transaction Date", "date", is_required=True)
+    csv_format_service.add_mapping(format_id, "Amount", "amount", is_required=True)
+    csv_format_service.add_mapping(format_id, "Description", "description")
+    csv_format_service.add_mapping(format_id, "Memo", "reference_number")
+
     return csv_format_service.get_format(format_id)
 
 
@@ -111,7 +127,7 @@ def sample_csv_format(csv_format_service, sample_account):
 def cli_runner():
     """Create a Click CLI test runner."""
     from click.testing import CliRunner
-    
+
     return CliRunner()
 
 
