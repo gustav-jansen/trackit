@@ -81,7 +81,9 @@ def init_categories(ctx, force: bool):
     # Create root categories first
     for category_name, parent_name in root_categories:
         try:
-            service.create_category(name=category_name, parent_path=None)
+            # Set Income category to type 1 (Income), all others default to 0 (Expense)
+            category_type = 1 if category_name == "Income" else None  # None uses default (Expense)
+            service.create_category(name=category_name, parent_path=None, category_type=category_type)
             created += 1
         except ValueError as e:
             click.echo(f"Warning: Could not create category '{category_name}': {e}", err=True)
@@ -90,7 +92,10 @@ def init_categories(ctx, force: bool):
     # Then create child categories
     for category_name, parent_name in child_categories:
         try:
-            service.create_category(name=category_name, parent_path=parent_name)
+            # Children inherit parent type, but we need to check if parent is Income
+            # For Income subcategories, set type to 1 (Income)
+            category_type = 1 if parent_name == "Income" else None  # None uses default (Expense)
+            service.create_category(name=category_name, parent_path=parent_name, category_type=category_type)
             created += 1
         except ValueError as e:
             click.echo(f"Warning: Could not create category '{category_name}': {e}", err=True)

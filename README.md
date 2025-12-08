@@ -156,13 +156,14 @@ pip install -e .
 
 - `trackit init-categories` - Initialize default category tree
 - `trackit category list` - List all categories
-- `trackit category create <name> [--parent <parent_path>]` - Create a category
+- `trackit category create <name> [--parent <parent_path>] [--type <type>]` - Create a category
+  - `--type` can be `expense` (default), `income`, or `transfer`
 
 ### Analysis
 
 - `trackit summary [--start-date <date>] [--end-date <date>] [--category <path>] [--include-transfers] [--expand]` - Show category summary
 
-The summary command displays category totals in a single "Total" column (net total: income + expenses). By default, it shows top-level categories. Use `--expand` to show the full category tree with indented subtotals for each category level.
+The summary command displays category totals in a single "Total" column (net total: income + expenses). Categories are grouped by type: Income categories are shown first with an Income subtotal, followed by Expense categories with an Expense subtotal, and finally the overall total. By default, it shows top-level categories. Use `--expand` to show the full category tree with indented subtotals for each category level. Transfer type categories are excluded by default unless `--include-transfers` is used.
 
 **Examples:**
 ```bash
@@ -280,6 +281,13 @@ Categories support unlimited depth. Use `>` to separate levels in category paths
 - `Food & Dining > Groceries`
 - `Food & Dining > Restaurants > Fast Food`
 
+Categories have types that determine how they appear in summaries:
+- **Income** (type 1): Categories for income transactions (e.g., Salary, Investment)
+- **Expense** (type 0, default): Categories for expense transactions (e.g., Food & Dining, Transportation)
+- **Transfer** (type 2): Categories for transfers between accounts (excluded from summary by default)
+
+When creating a category, you can specify the type with `--type expense|income|transfer`. If not specified, categories default to Expense type.
+
 ## Features
 
 ### Account Name Resolution
@@ -323,7 +331,7 @@ The `transaction list` command automatically displays totals at the bottom:
 
 ### Category Summary
 
-The `summary` command displays category totals in a single "Total" column showing the net total (income + expenses) for each category.
+The `summary` command displays category totals in a single "Total" column showing the net total (income + expenses) for each category. Categories are grouped by type: Income categories appear first with an Income subtotal, followed by Expense categories with an Expense subtotal, and finally the overall total.
 
 **Default view** (top-level categories only):
 ```
@@ -331,18 +339,31 @@ Category Summary:
 --------------------------------------------------------------------------------
 Category                                          Total
 --------------------------------------------------------------------------------
+Salary                                            $5,000.00
+Investment                                         $1,000.00
+--------------------------------------------------------------------------------
+Income Subtotal                                    $6,000.00
+
 Food & Dining                                    -$1,234.56
 Transportation                                    -$567.89
 --------------------------------------------------------------------------------
-TOTAL                                            -$1,802.45
+Expense Subtotal                                  -$1,802.45
+--------------------------------------------------------------------------------
+TOTAL                                             $4,197.55
 ```
 
-**Expanded view** (`--expand` flag) shows the full category tree with indentation:
+**Expanded view** (`--expand` flag) shows the full category tree with indentation, also grouped by type:
 ```
 Category Summary (Expanded):
 --------------------------------------------------------------------------------
 Category                                          Total
 --------------------------------------------------------------------------------
+Salary                                            $5,000.00
+  Base Salary                                     $4,500.00
+  Bonus                                            $500.00
+--------------------------------------------------------------------------------
+Income Subtotal                                    $6,000.00
+
 Food & Dining                                    -$1,234.56
   Groceries                                       -$800.00
   Coffee & Snacks                                -$434.56
@@ -350,10 +371,12 @@ Transportation                                    -$567.89
   Gas                                             -$400.00
   Parking                                         -$167.89
 --------------------------------------------------------------------------------
-TOTAL                                            -$1,802.45
+Expense Subtotal                                  -$1,802.45
+--------------------------------------------------------------------------------
+TOTAL                                             $4,197.55
 ```
 
-In the expanded view, parent category totals include all transactions from that category and all its descendant categories. The overall total at the bottom is the sum of all transactions matching the applied filters (date range, category filter, include_transfers flag).
+In the expanded view, parent category totals include all transactions from that category and all its descendant categories. The overall total at the bottom is the sum of all transactions matching the applied filters (date range, category filter, include_transfers flag). Transfer type categories are excluded by default unless `--include-transfers` is used.
 
 ## Development
 

@@ -38,14 +38,19 @@ def list_categories(ctx):
 @category_group.command("create")
 @click.argument("name")
 @click.option("--parent", help="Parent category path (e.g., 'Food & Dining')")
+@click.option("--type", "category_type", type=click.Choice(["expense", "income", "transfer"], case_sensitive=False), default="expense", help="Category type (default: expense)")
 @click.pass_context
-def create_category(ctx, name: str, parent: str):
+def create_category(ctx, name: str, parent: str, category_type: str):
     """Create a new category."""
     db = ctx.obj["db"]
     service = CategoryService(db)
 
+    # Map string values to integers: expense=0, income=1, transfer=2
+    type_map = {"expense": 0, "income": 1, "transfer": 2}
+    category_type_int = type_map[category_type.lower()]
+
     try:
-        category_id = service.create_category(name=name, parent_path=parent)
+        category_id = service.create_category(name=name, parent_path=parent, category_type=category_type_int)
         parent_str = f" under '{parent}'" if parent else ""
         click.echo(f"Created category '{name}'{parent_str} (ID: {category_id})")
     except ValueError as e:

@@ -238,8 +238,10 @@ class TransactionService:
                 uncategorized = True
             else:
                 category = self.db.get_category_by_path(category_path)
-                if category is not None:
-                    category_id = category.id
+                if category is None:
+                    # Category doesn't exist, return empty list
+                    return []
+                category_id = category.id
 
         return self.db.list_transactions(
             start_date=start_date,

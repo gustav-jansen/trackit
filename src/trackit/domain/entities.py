@@ -29,6 +29,7 @@ class Category:
     name: str
     parent_id: Optional[int]
     created_at: datetime
+    category_type: int = 0  # 0=Expense, 1=Income, 2=Transfer
 
 
 @dataclass(frozen=True)

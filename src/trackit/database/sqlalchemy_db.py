@@ -263,10 +263,12 @@ class SQLAlchemyDatabase(Database):
         session.commit()
 
     # Category operations
-    def create_category(self, name: str, parent_id: Optional[int] = None) -> int:
+    def create_category(self, name: str, parent_id: Optional[int] = None, category_type: Optional[int] = None) -> int:
         """Create a category. Returns category ID."""
         session = self._get_session()
-        category = Category(name=name, parent_id=parent_id)
+        # Default to Expense (0) if not specified
+        cat_type = category_type if category_type is not None else 0
+        category = Category(name=name, parent_id=parent_id, category_type=cat_type)
         session.add(category)
         session.commit()
         return category.id
@@ -332,6 +334,7 @@ class SQLAlchemyDatabase(Database):
                             "id": cat_domain.id,
                             "name": cat_domain.name,
                             "parent_id": cat_domain.parent_id,
+                            "category_type": cat_domain.category_type,
                             "created_at": cat_domain.created_at,
                             "children": children,
                         }
@@ -641,9 +644,17 @@ class SQLAlchemyDatabase(Database):
                 cat = session.query(Category).filter(Category.id == group_id).first()
                 category_name = cat.name if cat else ("Uncategorized" if category_id is None else "Unknown")
 
+            # Get category type for the category (None for uncategorized)
+            category_type = None
+            if group_id is not None:
+                cat = session.query(Category).filter(Category.id == group_id).first()
+                if cat:
+                    category_type = cat.category_type
+
             results.append({
                 "category_id": group_id,
                 "category_name": category_name,
+                "category_type": category_type,
                 "expenses": data["expenses"],
                 "income": data["income"],
                 "count": data["count"],
@@ -680,11 +691,15 @@ class SQLAlchemyDatabase(Database):
             descendant_ids = self._get_all_descendant_ids(category_id)
             query = query.filter(Transaction.category_id.in_(descendant_ids))
 
-        # Filter out Transfer category transactions if not including transfers
+        # Filter out Transfer type category transactions if not including transfers
         if not include_transfers:
-            transfer_category = self.get_category_by_path("Transfer")
-            if transfer_category is not None:
-                transfer_ids = self._get_all_descendant_ids(transfer_category.id)
+            # Get all categories with type 2 (Transfer) and their descendants
+            transfer_categories = session.query(Category).filter(Category.category_type == 2).all()
+            transfer_ids = set()
+            for cat in transfer_categories:
+                transfer_ids.update(self._get_all_descendant_ids(cat.id))
+
+            if transfer_ids:
                 # Exclude transfer categories, but include uncategorized (None) transactions
                 query = query.filter(
                     or_(Transaction.category_id.is_(None), ~Transaction.category_id.in_(transfer_ids))
