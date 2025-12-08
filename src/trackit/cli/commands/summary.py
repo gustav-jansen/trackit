@@ -210,7 +210,7 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
             for cat in income_tree:
                 total = _calculate_category_total(db, cat["id"], filtered_transactions)
                 income_subtotal += total
-            _display_expanded_summary(db, income_tree, filtered_transactions, indent=0, is_first=True)
+            _display_expanded_summary(db, income_tree, filtered_transactions, indent=1, is_first=True)
             if income_subtotal != 0:
                 click.echo("-" * 80)
                 income_subtotal_str = f"${income_subtotal:,.2f}"
@@ -226,7 +226,7 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
             for cat in expense_tree:
                 total = _calculate_category_total(db, cat["id"], filtered_transactions)
                 expense_subtotal += total
-            _display_expanded_summary(db, expense_tree, filtered_transactions, indent=0, is_first=True)
+            _display_expanded_summary(db, expense_tree, filtered_transactions, indent=1, is_first=True)
 
         # Display uncategorized if present (treated as Expense)
         if has_uncategorized:
@@ -234,7 +234,7 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
             expense_subtotal += uncategorized_total
             if uncategorized_total != 0:
                 total_str = f"${uncategorized_total:,.2f}"
-                click.echo(f"{'Uncategorized':<50} {total_str:>20}")
+                click.echo(f"    {'Uncategorized':<46} {total_str:>20}")
 
         # Show Expense subtotal if there are expense categories or uncategorized
         if expense_tree or has_uncategorized:
@@ -290,7 +290,7 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
             income_subtotal += total
             category_name = s["category_name"] or "Uncategorized"
             total_str = f"${total:,.2f}"
-            click.echo(f"{category_name:<50} {total_str:>20}")
+            click.echo(f"    {category_name:<46} {total_str:>20}")
 
         # Show Income subtotal if there are income categories
         if income_summaries:
@@ -310,7 +310,7 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
             expense_subtotal += total
             category_name = s["category_name"] or "Uncategorized"
             total_str = f"${total:,.2f}"
-            click.echo(f"{category_name:<50} {total_str:>20}")
+            click.echo(f"    {category_name:<46} {total_str:>20}")
 
         # Show Expense subtotal if there are expense categories
         if expense_summaries:
