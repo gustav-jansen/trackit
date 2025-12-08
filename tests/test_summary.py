@@ -468,16 +468,16 @@ def test_summary_expand_indentation(cli_runner, temp_db, sample_account, sample_
             break
 
     assert groceries_line is not None
-    # Should start with 4 spaces for indentation
-    assert groceries_line.startswith("    ")
-    # Parent category should not have indentation
+    # Should start with 8 spaces for indentation (child category: indent level 2)
+    assert groceries_line.startswith("        ")
+    # Parent category should have 4 spaces of indentation (indent level 1, relative to headers)
     food_line = None
     for line in lines:
         if "Food & Dining" in line and "Groceries" not in line:
             food_line = line
             break
     assert food_line is not None
-    assert not food_line.startswith("    ")
+    assert food_line.startswith("    ")
 
 
 def test_summary_groups_by_type_with_subtotals(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
