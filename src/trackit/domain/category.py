@@ -16,12 +16,13 @@ class CategoryService:
         """
         self.db = db
 
-    def create_category(self, name: str, parent_path: Optional[str] = None) -> int:
+    def create_category(self, name: str, parent_path: Optional[str] = None, category_type: Optional[int] = None) -> int:
         """Create a category.
 
         Args:
             name: Category name
             parent_path: Optional parent category path (e.g., "Food & Dining")
+            category_type: Optional category type (0=Expense, 1=Income, 2=Transfer). Defaults to 0 (Expense).
 
         Returns:
             Category ID
@@ -36,7 +37,7 @@ class CategoryService:
                 raise ValueError(f"Parent category '{parent_path}' not found")
             parent_id = parent.id
 
-        return self.db.create_category(name=name, parent_id=parent_id)
+        return self.db.create_category(name=name, parent_id=parent_id, category_type=category_type)
 
     def get_category(self, category_id: int) -> Optional[CategoryEntity]:
         """Get category by ID.

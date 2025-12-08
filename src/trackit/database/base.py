@@ -187,8 +187,14 @@ class Database(ABC):
 
     # Category operations
     @abstractmethod
-    def create_category(self, name: str, parent_id: Optional[int] = None) -> int:
-        """Create a category. Returns category ID."""
+    def create_category(self, name: str, parent_id: Optional[int] = None, category_type: Optional[int] = None) -> int:
+        """Create a category. Returns category ID.
+
+        Args:
+            name: Category name
+            parent_id: Optional parent category ID
+            category_type: Optional category type (0=Expense, 1=Income, 2=Transfer). Defaults to 0 (Expense).
+        """
         pass
 
     @abstractmethod

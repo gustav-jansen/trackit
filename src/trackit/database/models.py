@@ -78,6 +78,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    category_type = Column(Integer, default=0, nullable=False)  # 0=Expense, 1=Income, 2=Transfer
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     # Relationships

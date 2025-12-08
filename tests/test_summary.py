@@ -183,13 +183,13 @@ def test_summary_with_subcategory_filter(cli_runner, temp_db, sample_account, sa
 
 
 def test_summary_excludes_transfers_by_default(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
-    """Test that Transfer category transactions are excluded by default."""
+    """Test that Transfer type category transactions are excluded by default."""
     from datetime import date
     from decimal import Decimal
 
-    # Create Transfer category and subcategory
-    transfer_id = category_service.create_category(name="Transfer", parent_path=None)
-    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer")
+    # Create Transfer type category and subcategory (type 2 = Transfer)
+    transfer_id = category_service.create_category(name="Transfer", parent_path=None, category_type=2)
+    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer", category_type=2)
 
     # Add a regular transaction
     transaction_service.create_transaction(
@@ -227,13 +227,13 @@ def test_summary_excludes_transfers_by_default(cli_runner, temp_db, sample_accou
 
 
 def test_summary_includes_transfers_with_flag(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
-    """Test that Transfer category transactions are included with --include-transfers flag."""
+    """Test that Transfer type category transactions are included with --include-transfers flag."""
     from datetime import date
     from decimal import Decimal
 
-    # Create Transfer category and subcategory
-    transfer_id = category_service.create_category(name="Transfer", parent_path=None)
-    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer")
+    # Create Transfer type category and subcategory (type 2 = Transfer)
+    transfer_id = category_service.create_category(name="Transfer", parent_path=None, category_type=2)
+    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer", category_type=2)
 
     # Add a regular transaction
     transaction_service.create_transaction(
@@ -271,14 +271,14 @@ def test_summary_includes_transfers_with_flag(cli_runner, temp_db, sample_accoun
 
 
 def test_summary_excludes_transfers_with_subcategories(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
-    """Test that Transfer category and all its subcategories are excluded by default."""
+    """Test that Transfer type category and all its subcategories are excluded by default."""
     from datetime import date
     from decimal import Decimal
 
-    # Create Transfer category with multiple subcategories
-    transfer_id = category_service.create_category(name="Transfer", parent_path=None)
-    transfer_sub1_id = category_service.create_category(name="Between Accounts", parent_path="Transfer")
-    transfer_sub2_id = category_service.create_category(name="To Investment", parent_path="Transfer")
+    # Create Transfer type category with multiple subcategories (type 2 = Transfer)
+    transfer_id = category_service.create_category(name="Transfer", parent_path=None, category_type=2)
+    transfer_sub1_id = category_service.create_category(name="Between Accounts", parent_path="Transfer", category_type=2)
+    transfer_sub2_id = category_service.create_category(name="To Investment", parent_path="Transfer", category_type=2)
 
     # Add regular transactions
     transaction_service.create_transaction(
@@ -478,4 +478,77 @@ def test_summary_expand_indentation(cli_runner, temp_db, sample_account, sample_
             break
     assert food_line is not None
     assert not food_line.startswith("    ")
+
+
+def test_summary_groups_by_type_with_subtotals(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+    """Test that summary groups categories by type (Income first, then Expense) with subtotals."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create an Income type category
+    income_cat_id = category_service.create_category(name="Salary", parent_path=None, category_type=1)
+
+    # Add income transaction
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("5000.00"),
+        description="Monthly salary",
+        category_id=income_cat_id,
+    )
+
+    # Add expense transaction
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 16),
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+
+    # Check that Income section comes first
+    output_lines = result.output.split('\n')
+    income_index = None
+    expense_index = None
+    income_subtotal_index = None
+    expense_subtotal_index = None
+
+    for i, line in enumerate(output_lines):
+        if "Salary" in line:
+            income_index = i
+        if "Food & Dining" in line:
+            expense_index = i
+        if "Income Subtotal" in line:
+            income_subtotal_index = i
+        if "Expense Subtotal" in line:
+            expense_subtotal_index = i
+
+    # Income should come before Expense
+    assert income_index is not None
+    assert expense_index is not None
+    assert income_index < expense_index
+
+    # Subtotals should be present
+    assert income_subtotal_index is not None
+    assert expense_subtotal_index is not None
+
+    # Income subtotal should come after Income categories but before Expense categories
+    assert income_subtotal_index > income_index
+    assert income_subtotal_index < expense_index
+
+    # Expense subtotal should come after Expense categories
+    assert expense_subtotal_index > expense_index
+
+    # Check that totals are correct
+    assert "5000.00" in result.output or "5,000.00" in result.output
+    assert "-50.00" in result.output
 

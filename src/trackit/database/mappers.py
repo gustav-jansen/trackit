@@ -31,6 +31,7 @@ def category_to_domain(orm_category: ORMCategory) -> domain.Category:
         name=orm_category.name,
         parent_id=orm_category.parent_id,
         created_at=orm_category.created_at,
+        category_type=orm_category.category_type,
     )
 
 
