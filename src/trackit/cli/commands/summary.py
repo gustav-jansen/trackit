@@ -183,8 +183,9 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
         click.echo(f"{'Category':<50} {'Total':>20}")
         click.echo("-" * 80)
 
-        # Group category tree by type: Income (1) first, then Expense (0)
+        # Group category tree by type: Income (1), Transfer (2), Expense (0)
         income_tree = []
+        transfer_tree = []
         expense_tree = []
         uncategorized_total = 0.0
 
@@ -196,11 +197,14 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
                     cat_type = _get_category_type(db, cat["id"])
                 if cat_type == 1:  # Income
                     income_tree.append(cat)
+                elif cat_type == 2 and include_transfers:  # Transfer (only if including transfers)
+                    transfer_tree.append(cat)
                 else:  # Expense (0) or None
                     expense_tree.append(cat)
 
         # Calculate subtotals
         income_subtotal = 0.0
+        transfer_subtotal = 0.0
         expense_subtotal = 0.0
 
         # Display Income categories first
@@ -215,6 +219,21 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
                 click.echo("-" * 80)
                 income_subtotal_str = f"${income_subtotal:,.2f}"
                 click.echo(f"{'Income Subtotal':<50} {income_subtotal_str:>20}")
+                click.echo("=" * 80)
+                click.echo()
+
+        # Display Transfer categories (only if including transfers)
+        if transfer_tree:
+            click.echo("Transfer")
+            click.echo("*" * 80)
+            for cat in transfer_tree:
+                total = _calculate_category_total(db, cat["id"], filtered_transactions)
+                transfer_subtotal += total
+            _display_expanded_summary(db, transfer_tree, filtered_transactions, indent=1, is_first=True)
+            if transfer_subtotal != 0:
+                click.echo("-" * 80)
+                transfer_subtotal_str = f"${transfer_subtotal:,.2f}"
+                click.echo(f"{'Transfer Subtotal':<50} {transfer_subtotal_str:>20}")
                 click.echo("=" * 80)
                 click.echo()
 
@@ -258,9 +277,10 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
         click.echo(f"{'Category':<50} {'Total':>20}")
         click.echo("-" * 80)
 
-        # Group summaries by category type: Income (1) first, then Expense (0)
+        # Group summaries by category type: Income (1), Transfer (2), Expense (0)
         # Uncategorized (None) will be treated as Expense type
         income_summaries = []
+        transfer_summaries = []
         expense_summaries = []
 
         for s in summaries:
@@ -270,14 +290,16 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
                 continue
 
             cat_type = s.get("category_type")
-            # Income type is 1, everything else (including None/uncategorized) is treated as Expense
             if cat_type == 1:  # Income
                 income_summaries.append(s)
+            elif cat_type == 2 and include_transfers:  # Transfer (only if including transfers)
+                transfer_summaries.append(s)
             else:  # Expense (0) or Uncategorized (None)
                 expense_summaries.append(s)
 
         # Sort each group by absolute value (descending), then by name for ties
         income_summaries.sort(key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or ""))
+        transfer_summaries.sort(key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or ""))
         expense_summaries.sort(key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or ""))
 
         # Display Income categories first
@@ -297,6 +319,26 @@ def summary(ctx, start_date: str, end_date: str, category: str, include_transfer
             click.echo("-" * 80)
             income_subtotal_str = f"${income_subtotal:,.2f}"
             click.echo(f"{'Income Subtotal':<50} {income_subtotal_str:>20}")
+            click.echo("=" * 80)
+            click.echo()
+
+        # Display Transfer categories (only if including transfers)
+        if transfer_summaries:
+            click.echo("Transfer")
+            click.echo("*" * 80)
+        transfer_subtotal = 0.0
+        for s in transfer_summaries:
+            total = s["expenses"] + s["income"]
+            transfer_subtotal += total
+            category_name = s["category_name"] or "Uncategorized"
+            total_str = f"${total:,.2f}"
+            click.echo(f"    {category_name:<46} {total_str:>20}")
+
+        # Show Transfer subtotal if there are transfer categories
+        if transfer_summaries:
+            click.echo("-" * 80)
+            transfer_subtotal_str = f"${transfer_subtotal:,.2f}"
+            click.echo(f"{'Transfer Subtotal':<50} {transfer_subtotal_str:>20}")
             click.echo("=" * 80)
             click.echo()
 
