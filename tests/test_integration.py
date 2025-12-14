@@ -113,11 +113,13 @@ def test_workflow_with_categorization(cli_runner, temp_db, sample_categories, sa
     from datetime import date
     from decimal import Decimal
 
+    # Use recent date within the default 6-month range
+    today = date.today()
     # Create a transaction
     txn_id = transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
-        date=date(2024, 1, 15),
+        date=today,
         amount=Decimal("-50.00"),
         description="Grocery Store",
     )

@@ -134,3 +134,17 @@ def get_date_range(period: str) -> tuple[date, date]:
 
     else:
         raise ValueError(f"Unknown period: '{period}'. Supported periods: this-month, this-year, this-week, last-month, last-year, last-week")
+
+
+def get_last_six_months_range() -> tuple[date, date]:
+    """Get start and end dates for last 6 months including current month.
+
+    Returns:
+        Tuple of (start_date, end_date) for the last 6 months including current month
+    """
+    today = date.today()
+    # Start date: first day of 6 months ago
+    start_date = (today - relativedelta(months=5)).replace(day=1)
+    # End date: today (current month)
+    end_date = today
+    return (start_date, end_date)

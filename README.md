@@ -105,6 +105,8 @@ pip install -e .
    trackit summary --start-date 2024-01-01 --end-date 2024-01-31
    trackit summary --this-month
    trackit summary --last-year --expand
+   trackit summary --group-by-month  # Columnar format grouped by month
+   trackit summary --group-by-year --expand  # Columnar format grouped by year with expanded view
    ```
 
 9. **Manage transactions and formats**:
@@ -165,9 +167,17 @@ pip install -e .
 
 ### Analysis
 
-- `trackit summary [--start-date <date>] [--end-date <date>] [--this-month] [--this-year] [--this-week] [--last-month] [--last-year] [--last-week] [--category <path>] [--include-transfers] [--expand]` - Show category summary
+- `trackit summary [--start-date <date>] [--end-date <date>] [--this-month] [--this-year] [--this-week] [--last-month] [--last-year] [--last-week] [--category <path>] [--include-transfers] [--expand] [--group-by-month] [--group-by-year]` - Show category summary
 
 The summary command displays category totals in a single "Total" column (net total: income + expenses). Categories are grouped by type: Income categories are shown first with an Income subtotal, followed by Expense categories with an Expense subtotal, and finally the overall total. By default, it shows top-level categories. Use `--expand` to show the full category tree with indented subtotals for each category level. Transfer type categories are excluded by default unless `--include-transfers` is used.
+
+**Columnar grouping options** (`--group-by-month` or `--group-by-year`):
+- Transform the output into a columnar format where each column represents a time period (month or year)
+- First column shows category names, subsequent columns show totals for each period
+- Periods are sorted chronologically (oldest to newest)
+- Works with both standard and expanded views
+- If no date range is specified, includes all transactions
+- `--group-by-month` and `--group-by-year` are mutually exclusive
 
 **Examples:**
 ```bash
@@ -191,6 +201,18 @@ trackit summary --category "Food & Dining" --expand
 
 # Summary for last month with expanded view
 trackit summary --last-month --expand
+
+# Columnar summary grouped by month
+trackit summary --group-by-month
+
+# Columnar summary grouped by year for a date range
+trackit summary --group-by-year --start-date 2023-01-01 --end-date 2024-12-31
+
+# Columnar summary with expanded view
+trackit summary --group-by-month --expand
+
+# Columnar summary for specific category
+trackit summary --group-by-month --category "Food & Dining"
 ```
 
 **Note**: Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc. Period options (`--this-month`, `--this-year`, `--this-week`, `--last-month`, `--last-year`, `--last-week`) provide convenient shortcuts for common date ranges. Only one period option can be specified at a time, and they cannot be combined with `--start-date` or `--end-date`.
