@@ -7,13 +7,15 @@ from trackit.domain.transaction import TransactionService
 @click.command("categorize")
 @click.argument("transaction_ids", nargs=-1, required=True, type=int)
 @click.argument("category_path", nargs=1)
+@click.option("--force", is_flag=True, help="Force recategorization of transactions that already have a category")
 @click.pass_context
-def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path: str):
+def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path: str, force: bool):
     """Assign a category to one or more transactions.
-    
+
     Examples:
         trackit categorize 1 "Food & Dining > Groceries"
         trackit categorize 1 2 3 4 5 "Food & Dining > Groceries"
+        trackit categorize 1 "Food & Dining > Restaurants" --force
     """
     db = ctx.obj["db"]
     service = TransactionService(db)
@@ -52,6 +54,20 @@ def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path:
 
     for txn_id in unique_ids:
         try:
+            # Check if transaction already has a category (unless --force is used)
+            if not force:
+                txn = service.get_transaction(txn_id)
+                if txn is None:
+                    raise ValueError(f"Transaction {txn_id} not found")
+                if txn.category_id is not None:
+                    # Get current category path for error message
+                    current_path = category_service.format_category_path(txn.category_id)
+                    error_msg = f"Transaction {txn_id} already has category '{current_path}'. Use --force to recategorize."
+                    errors.append((txn_id, error_msg))
+                    if len(unique_ids) > 1:
+                        click.echo(f"✗ Transaction {txn_id}: {error_msg}")
+                    continue
+
             service.update_category(transaction_id=txn_id, category_path=category_path)
             successes.append(txn_id)
             if len(unique_ids) == 1:

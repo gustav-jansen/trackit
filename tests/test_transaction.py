@@ -509,6 +509,186 @@ def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, samp
     # Should only process once despite duplicates (no error about duplicate processing)
 
 
+def test_categorize_uncategorized_transaction(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test categorizing an uncategorized transaction (should work without --force)."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create uncategorized transaction
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            str(txn_id),
+            "Food & Dining > Groceries",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "categorized" in result.output.lower()
+    assert "Food & Dining > Groceries" in result.output
+
+
+def test_categorize_already_categorized_without_force(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test attempting to recategorize without --force (should fail)."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create and categorize a transaction
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Try to recategorize without --force
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            str(txn_id),
+            "Food & Dining > Restaurants",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "already has category" in result.output.lower()
+    assert "Food & Dining > Groceries" in result.output
+    assert "--force" in result.output.lower()
+
+
+def test_categorize_already_categorized_with_force(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test recategorizing with --force flag (should succeed)."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create and categorize a transaction
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Test Transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Recategorize with --force
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            "--force",
+            str(txn_id),
+            "Food & Dining > Restaurants",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "categorized" in result.output.lower()
+    assert "Food & Dining > Restaurants" in result.output
+
+    # Verify the category was actually changed
+    txn = transaction_service.get_transaction(txn_id)
+    assert txn is not None
+    assert txn.category_id == sample_categories["Food & Dining > Restaurants"]
+
+
+def test_categorize_multiple_mixed_states(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test multiple transactions with mixed states (categorized/uncategorized)."""
+    from datetime import date
+    from decimal import Decimal
+
+    # Create one uncategorized transaction
+    txn1_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Transaction 1",
+    )
+
+    # Create one categorized transaction
+    txn2_id = transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 16),
+        amount=Decimal("-30.00"),
+        description="Transaction 2",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Try to categorize both without --force (should fail for txn2)
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            str(txn1_id),
+            str(txn2_id),
+            "Food & Dining > Restaurants",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Categorizing 2 transactions" in result.output
+    assert "succeeded" in result.output.lower()
+    assert "failed" in result.output.lower()
+    assert "already has category" in result.output.lower()
+    assert "Food & Dining > Groceries" in result.output
+
+    # Verify txn1 was categorized, txn2 was not
+    txn1 = transaction_service.get_transaction(txn1_id)
+    txn2 = transaction_service.get_transaction(txn2_id)
+    assert txn1 is not None
+    assert txn2 is not None
+    assert txn1.category_id == sample_categories["Food & Dining > Restaurants"]
+    assert txn2.category_id == sample_categories["Food & Dining > Groceries"]  # Unchanged
+
+    # Now try with --force (should succeed for both)
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "categorize",
+            "--force",
+            str(txn1_id),
+            str(txn2_id),
+            "Food & Dining > Groceries",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "succeeded" in result.output.lower()
+    assert "failed" in result.output.lower() or "0 failed" in result.output
+
+    # Verify both were recategorized
+    txn1 = transaction_service.get_transaction(txn1_id)
+    txn2 = transaction_service.get_transaction(txn2_id)
+    assert txn1 is not None
+    assert txn2 is not None
+    assert txn1.category_id == sample_categories["Food & Dining > Groceries"]
+    assert txn2.category_id == sample_categories["Food & Dining > Groceries"]
+
+
 def test_notes_add(cli_runner, temp_db, sample_account, transaction_service):
     """Test adding notes to a transaction."""
     from datetime import date

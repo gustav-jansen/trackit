@@ -97,7 +97,10 @@ pip install -e .
    ```bash
    trackit categorize 1 "Food & Dining > Groceries"
    trackit categorize 1 2 3 4 5 "Food & Dining > Groceries"  # Multiple transactions
+   trackit categorize 1 "Food & Dining > Restaurants" --force  # Recategorize (requires --force)
    ```
+
+   **Note**: The categorize command protects transactions that already have a category assigned. To recategorize a transaction, use the `--force` flag. Uncategorized transactions can be categorized normally without the flag.
 
 8. **View summaries**:
    ```bash
@@ -151,7 +154,7 @@ pip install -e .
 - `trackit import <csv_file> --format <format_name>` - Import transactions from CSV
 - `trackit add --account <name_or_id> --date <date> --amount <amount> [options]` - Add transaction manually
 - `trackit transaction list [--start-date <date>] [--end-date <date>] [--this-month] [--this-year] [--this-week] [--last-month] [--last-year] [--last-week] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
-- `trackit categorize <transaction_id> [transaction_id ...] <category_path>` - Assign category to one or more transactions
+- `trackit categorize <transaction_id> [transaction_id ...] <category_path> [--force]` - Assign category to one or more transactions. Use `--force` to recategorize transactions that already have a category.
 - `trackit notes <transaction_id> [<notes>] [--clear]` - Update transaction notes
 - `trackit transaction update <id> [--account <account>] [--date <date>] [--amount <amount>] [--description <desc>] [--reference <ref>] [--category <category>] [--notes <notes>]` - Update transaction fields
 - `trackit transaction delete <id>` - Delete a transaction
