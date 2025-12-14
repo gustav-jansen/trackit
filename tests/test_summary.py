@@ -1,6 +1,7 @@
 """Tests for summary command."""
 
 import pytest
+from datetime import timedelta
 from click.testing import CliRunner
 from trackit.cli.main import cli
 
@@ -551,4 +552,253 @@ def test_summary_groups_by_type_with_subtotals(cli_runner, temp_db, sample_accou
     # Check that totals are correct
     assert "5000.00" in result.output or "5,000.00" in result.output
     assert "-50.00" in result.output
+
+
+def test_summary_this_month(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test summary with --this-month option."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in current month
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="This month transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Create transaction in previous month (should be excluded)
+    last_month_date = (today - timedelta(days=32)).replace(day=1)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=last_month_date,
+        amount=Decimal("-25.00"),
+        description="Last month transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary", "--this-month"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "-50.00" in result.output
+    # Should not include last month's transaction
+    assert "-25.00" not in result.output
+
+
+def test_summary_this_year(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test summary with --this-year option."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in current year
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(today.year, 1, 15),
+        amount=Decimal("-50.00"),
+        description="This year transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Create transaction in previous year (should be excluded)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(today.year - 1, 12, 15),
+        amount=Decimal("-25.00"),
+        description="Last year transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary", "--this-year"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "-50.00" in result.output
+    # Should not include last year's transaction
+    assert "-25.00" not in result.output
+
+
+def test_summary_last_month(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test summary with --last-month option."""
+    from datetime import date
+    from dateutil.relativedelta import relativedelta
+    from decimal import Decimal
+
+    today = date.today()
+    last_month_start = (today - relativedelta(months=1)).replace(day=1)
+    last_month_end = today.replace(day=1) - timedelta(days=1)
+
+    # Create transaction in last month
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=last_month_start,
+        amount=Decimal("-50.00"),
+        description="Last month transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Create transaction in current month (should be excluded)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.00"),
+        description="This month transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary", "--last-month"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "-50.00" in result.output
+    # Should not include this month's transaction
+    assert "-25.00" not in result.output
+
+
+def test_summary_last_year(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test summary with --last-year option."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in last year
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(today.year - 1, 6, 15),
+        amount=Decimal("-50.00"),
+        description="Last year transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    # Create transaction in current year (should be excluded)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.00"),
+        description="This year transaction",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary", "--last-year"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "-50.00" in result.output
+    # Should not include this year's transaction
+    assert "-25.00" not in result.output
+
+
+def test_summary_period_options_validation_multiple(cli_runner, temp_db):
+    """Test that multiple period options are rejected."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--this-month",
+            "--last-month",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Only one period option" in result.output
+
+
+def test_summary_period_options_validation_with_start_date(cli_runner, temp_db):
+    """Test that period options cannot be combined with --start-date."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--this-month",
+            "--start-date",
+            "2024-01-01",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "cannot be combined" in result.output
+
+
+def test_summary_period_options_validation_with_end_date(cli_runner, temp_db):
+    """Test that period options cannot be combined with --end-date."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--this-month",
+            "--end-date",
+            "2024-01-31",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "cannot be combined" in result.output
+
+
+def test_summary_period_options_with_category(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test that period options work with --category filter."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-30.00"),
+        description="Gas",
+        category_id=sample_categories["Transportation > Gas"],
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--this-month",
+            "--category",
+            "Food & Dining",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "-50.00" in result.output
+    # Should not show Transportation
+    assert "Transportation" not in result.output
 

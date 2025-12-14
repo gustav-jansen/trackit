@@ -6,7 +6,7 @@ from decimal import Decimal
 from trackit.domain.transaction import TransactionService
 from trackit.domain.account import AccountService
 from trackit.domain.category import CategoryService
-from trackit.utils.date_parser import parse_date
+from trackit.utils.date_parser import parse_date, get_date_range
 from trackit.utils.amount_parser import parse_amount
 from trackit.utils.account_resolver import resolve_account
 
@@ -116,13 +116,31 @@ def update_transaction(
 @transaction_group.command("list")
 @click.option("--start-date", help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')")
 @click.option("--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')")
+@click.option("--this-month", is_flag=True, help="Filter to current month")
+@click.option("--this-year", is_flag=True, help="Filter to current year")
+@click.option("--this-week", is_flag=True, help="Filter to current week")
+@click.option("--last-month", is_flag=True, help="Filter to previous month")
+@click.option("--last-year", is_flag=True, help="Filter to previous year")
+@click.option("--last-week", is_flag=True, help="Filter to previous week")
 @click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries')")
 @click.option("--account", help="Account name or ID")
 @click.option("--uncategorized", is_flag=True, help="Show only uncategorized transactions")
 @click.option("--verbose", "-v", is_flag=True, help="Show all columns including notes, reference, and unique_id")
 @click.pass_context
 def list_transactions(
-    ctx, start_date: str, end_date: str, category: str, account: str, uncategorized: bool, verbose: bool
+    ctx,
+    start_date: str,
+    end_date: str,
+    this_month: bool,
+    this_year: bool,
+    this_week: bool,
+    last_month: bool,
+    last_year: bool,
+    last_week: bool,
+    category: str,
+    account: str,
+    uncategorized: bool,
+    verbose: bool,
 ):
     """View transactions with optional filters.
 
@@ -135,22 +153,51 @@ def list_transactions(
     category_service = CategoryService(db)
     account_service = AccountService(db)
 
+    # Validate period options
+    period_options = [this_month, this_year, this_week, last_month, last_year, last_week]
+    period_count = sum(period_options)
+
+    if period_count > 1:
+        click.echo("Error: Only one period option (--this-month, --this-year, --this-week, --last-month, --last-year, --last-week) can be specified at a time.", err=True)
+        ctx.exit(1)
+
+    if period_count > 0 and (start_date or end_date):
+        click.echo("Error: Period options (--this-month, --this-year, etc.) cannot be combined with --start-date or --end-date.", err=True)
+        ctx.exit(1)
+
     # Parse dates
     start = None
-    if start_date:
-        try:
-            start = parse_date(start_date)
-        except ValueError as e:
-            click.echo(f"Error: Invalid start date: {e}", err=True)
-            ctx.exit(1)
-
     end = None
-    if end_date:
-        try:
-            end = parse_date(end_date)
-        except ValueError as e:
-            click.echo(f"Error: Invalid end date: {e}", err=True)
-            ctx.exit(1)
+
+    if period_count == 1:
+        # Determine which period option was set
+        if this_month:
+            start, end = get_date_range("this-month")
+        elif this_year:
+            start, end = get_date_range("this-year")
+        elif this_week:
+            start, end = get_date_range("this-week")
+        elif last_month:
+            start, end = get_date_range("last-month")
+        elif last_year:
+            start, end = get_date_range("last-year")
+        elif last_week:
+            start, end = get_date_range("last-week")
+    else:
+        # Use explicit start/end dates if provided
+        if start_date:
+            try:
+                start = parse_date(start_date)
+            except ValueError as e:
+                click.echo(f"Error: Invalid start date: {e}", err=True)
+                ctx.exit(1)
+
+        if end_date:
+            try:
+                end = parse_date(end_date)
+            except ValueError as e:
+                click.echo(f"Error: Invalid end date: {e}", err=True)
+                ctx.exit(1)
 
     # Resolve account name to ID if provided
     account_id = None

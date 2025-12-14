@@ -3,7 +3,7 @@
 import click
 from trackit.domain.transaction import TransactionService
 from trackit.domain.category import CategoryService
-from trackit.utils.date_parser import parse_date
+from trackit.utils.date_parser import parse_date, get_date_range
 
 
 def _get_filtered_transactions(db, start_date, end_date, category_path, include_transfers):
@@ -109,31 +109,79 @@ def _display_expanded_summary(db, category_tree, transactions, indent=0, is_firs
 @click.command("summary")
 @click.option("--start-date", help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')")
 @click.option("--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')")
+@click.option("--this-month", is_flag=True, help="Filter to current month")
+@click.option("--this-year", is_flag=True, help="Filter to current year")
+@click.option("--this-week", is_flag=True, help="Filter to current week")
+@click.option("--last-month", is_flag=True, help="Filter to previous month")
+@click.option("--last-year", is_flag=True, help="Filter to previous year")
+@click.option("--last-week", is_flag=True, help="Filter to previous week")
 @click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries')")
 @click.option("--include-transfers", is_flag=True, help="Include transactions with Transfer category")
 @click.option("--expand", is_flag=True, help="Expand entire category tree with subtotals")
 @click.pass_context
-def summary(ctx, start_date: str, end_date: str, category: str, include_transfers: bool, expand: bool):
+def summary(
+    ctx,
+    start_date: str,
+    end_date: str,
+    this_month: bool,
+    this_year: bool,
+    this_week: bool,
+    last_month: bool,
+    last_year: bool,
+    last_week: bool,
+    category: str,
+    include_transfers: bool,
+    expand: bool,
+):
     """Show category summary."""
     db = ctx.obj["db"]
     service = TransactionService(db)
 
+    # Validate period options
+    period_options = [this_month, this_year, this_week, last_month, last_year, last_week]
+    period_count = sum(period_options)
+
+    if period_count > 1:
+        click.echo("Error: Only one period option (--this-month, --this-year, --this-week, --last-month, --last-year, --last-week) can be specified at a time.", err=True)
+        ctx.exit(1)
+
+    if period_count > 0 and (start_date or end_date):
+        click.echo("Error: Period options (--this-month, --this-year, etc.) cannot be combined with --start-date or --end-date.", err=True)
+        ctx.exit(1)
+
     # Parse dates
     start = None
-    if start_date:
-        try:
-            start = parse_date(start_date)
-        except ValueError as e:
-            click.echo(f"Error: Invalid start date: {e}", err=True)
-            ctx.exit(1)
-
     end = None
-    if end_date:
-        try:
-            end = parse_date(end_date)
-        except ValueError as e:
-            click.echo(f"Error: Invalid end date: {e}", err=True)
-            ctx.exit(1)
+
+    if period_count == 1:
+        # Determine which period option was set
+        if this_month:
+            start, end = get_date_range("this-month")
+        elif this_year:
+            start, end = get_date_range("this-year")
+        elif this_week:
+            start, end = get_date_range("this-week")
+        elif last_month:
+            start, end = get_date_range("last-month")
+        elif last_year:
+            start, end = get_date_range("last-year")
+        elif last_week:
+            start, end = get_date_range("last-week")
+    else:
+        # Use explicit start/end dates if provided
+        if start_date:
+            try:
+                start = parse_date(start_date)
+            except ValueError as e:
+                click.echo(f"Error: Invalid start date: {e}", err=True)
+                ctx.exit(1)
+
+        if end_date:
+            try:
+                end = parse_date(end_date)
+            except ValueError as e:
+                click.echo(f"Error: Invalid end date: {e}", err=True)
+                ctx.exit(1)
 
     # Get filtered transactions for overall total calculation
     filtered_transactions = _get_filtered_transactions(db, start, end, category, include_transfers)

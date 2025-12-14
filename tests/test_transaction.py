@@ -1,6 +1,7 @@
 """Tests for transaction commands."""
 
 import pytest
+from datetime import timedelta
 from click.testing import CliRunner
 from trackit.cli.main import cli
 
@@ -786,4 +787,360 @@ def test_transaction_delete_not_found(cli_runner, temp_db):
 
     assert result.exit_code == 1
     assert "not found" in result.output.lower()
+
+
+def test_transaction_list_this_month(cli_runner, temp_db, sample_account, transaction_service):
+    """Test transaction list with --this-month option."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in current month
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="This month transaction",
+    )
+
+    # Create transaction in previous month (should be excluded)
+    last_month_date = (today - timedelta(days=32)).replace(day=1)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=last_month_date,
+        amount=Decimal("-25.00"),
+        description="Last month transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "transaction", "list", "--this-month"]
+    )
+
+    assert result.exit_code == 0
+    assert "This month transaction" in result.output
+    # Should not include last month's transaction
+    assert "Last month transaction" not in result.output
+
+
+def test_transaction_list_this_year(cli_runner, temp_db, sample_account, transaction_service):
+    """Test transaction list with --this-year option."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in current year
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(today.year, 1, 15),
+        amount=Decimal("-50.00"),
+        description="This year transaction",
+    )
+
+    # Create transaction in previous year (should be excluded)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(today.year - 1, 12, 15),
+        amount=Decimal("-25.00"),
+        description="Last year transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "transaction", "list", "--this-year"]
+    )
+
+    assert result.exit_code == 0
+    assert "This year transaction" in result.output
+    # Should not include last year's transaction
+    assert "Last year transaction" not in result.output
+
+
+def test_transaction_list_last_month(cli_runner, temp_db, sample_account, transaction_service):
+    """Test transaction list with --last-month option."""
+    from datetime import date
+    from dateutil.relativedelta import relativedelta
+    from decimal import Decimal
+
+    today = date.today()
+    last_month_start = (today - relativedelta(months=1)).replace(day=1)
+
+    # Create transaction in last month
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=last_month_start,
+        amount=Decimal("-50.00"),
+        description="Last month transaction",
+    )
+
+    # Create transaction in current month (should be excluded)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.00"),
+        description="This month transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "transaction", "list", "--last-month"]
+    )
+
+    assert result.exit_code == 0
+    assert "Last month transaction" in result.output
+    # Should not include this month's transaction
+    assert "This month transaction" not in result.output
+
+
+def test_transaction_list_last_year(cli_runner, temp_db, sample_account, transaction_service):
+    """Test transaction list with --last-year option."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in last year
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(today.year - 1, 6, 15),
+        amount=Decimal("-50.00"),
+        description="Last year transaction",
+    )
+
+    # Create transaction in current year (should be excluded)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.00"),
+        description="This year transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "transaction", "list", "--last-year"]
+    )
+
+    assert result.exit_code == 0
+    assert "Last year transaction" in result.output
+    # Should not include this year's transaction
+    assert "This year transaction" not in result.output
+
+
+def test_transaction_list_this_week(cli_runner, temp_db, sample_account, transaction_service):
+    """Test transaction list with --this-week option."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in current week
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="This week transaction",
+    )
+
+    # Create transaction in previous week (should be excluded)
+    days_since_monday = today.weekday()
+    last_week_monday = today - timedelta(days=days_since_monday + 7)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=last_week_monday,
+        amount=Decimal("-25.00"),
+        description="Last week transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "transaction", "list", "--this-week"]
+    )
+
+    assert result.exit_code == 0
+    assert "This week transaction" in result.output
+    # Should not include last week's transaction
+    assert "Last week transaction" not in result.output
+
+
+def test_transaction_list_last_week(cli_runner, temp_db, sample_account, transaction_service):
+    """Test transaction list with --last-week option."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    today = date.today()
+    # Create transaction in last week
+    days_since_monday = today.weekday()
+    last_week_monday = today - timedelta(days=days_since_monday + 7)
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=last_week_monday,
+        amount=Decimal("-50.00"),
+        description="Last week transaction",
+    )
+
+    # Create transaction in current week (should be excluded)
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.00"),
+        description="This week transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "transaction", "list", "--last-week"]
+    )
+
+    assert result.exit_code == 0
+    assert "Last week transaction" in result.output
+    # Should not include this week's transaction
+    assert "This week transaction" not in result.output
+
+
+def test_transaction_list_period_options_validation_multiple(cli_runner, temp_db):
+    """Test that multiple period options are rejected."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "list",
+            "--this-month",
+            "--last-month",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Only one period option" in result.output
+
+
+def test_transaction_list_period_options_validation_with_start_date(cli_runner, temp_db):
+    """Test that period options cannot be combined with --start-date."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "list",
+            "--this-month",
+            "--start-date",
+            "2024-01-01",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "cannot be combined" in result.output
+
+
+def test_transaction_list_period_options_validation_with_end_date(cli_runner, temp_db):
+    """Test that period options cannot be combined with --end-date."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "list",
+            "--this-month",
+            "--end-date",
+            "2024-01-31",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "cannot be combined" in result.output
+
+
+def test_transaction_list_period_options_with_category(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+    """Test that period options work with --category filter."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-30.00"),
+        description="Gas",
+        category_id=sample_categories["Transportation > Gas"],
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "list",
+            "--this-month",
+            "--category",
+            "Food & Dining > Groceries",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Groceries" in result.output
+    # Should not show Transportation transaction
+    assert "Gas" not in result.output
+
+
+def test_transaction_list_period_options_with_account(cli_runner, temp_db, sample_account, transaction_service):
+    """Test that period options work with --account filter."""
+    from datetime import date
+    from decimal import Decimal
+    from trackit.domain.account import AccountService
+
+    account_service = AccountService(temp_db)
+    account2_id = account_service.create_account("Account 2", "Bank 2")
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Account 1 transaction",
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=account2_id,
+        date=today,
+        amount=Decimal("-30.00"),
+        description="Account 2 transaction",
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "list",
+            "--this-month",
+            "--account",
+            "Test Account",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Account 1 transaction" in result.output
+    # Should not show Account 2 transaction
+    assert "Account 2 transaction" not in result.output
 

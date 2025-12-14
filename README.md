@@ -89,6 +89,8 @@ pip install -e .
    trackit transaction list --category "Food & Dining > Groceries" --verbose
    trackit transaction list --account "Chase" --uncategorized
    trackit transaction list --start-date "last month" --end-date "today"
+   trackit transaction list --this-month
+   trackit transaction list --last-year
    ```
 
 7. **Categorize transactions**:
@@ -101,6 +103,8 @@ pip install -e .
    ```bash
    trackit summary
    trackit summary --start-date 2024-01-01 --end-date 2024-01-31
+   trackit summary --this-month
+   trackit summary --last-year --expand
    ```
 
 9. **Manage transactions and formats**:
@@ -144,13 +148,13 @@ pip install -e .
 
 - `trackit import <csv_file> --format <format_name>` - Import transactions from CSV
 - `trackit add --account <name_or_id> --date <date> --amount <amount> [options]` - Add transaction manually
-- `trackit transaction list [--start-date <date>] [--end-date <date>] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
+- `trackit transaction list [--start-date <date>] [--end-date <date>] [--this-month] [--this-year] [--this-week] [--last-month] [--last-year] [--last-week] [--category <path>] [--account <name_or_id>] [--uncategorized] [--verbose]` - View transactions
 - `trackit categorize <transaction_id> [transaction_id ...] <category_path>` - Assign category to one or more transactions
 - `trackit notes <transaction_id> [<notes>] [--clear]` - Update transaction notes
 - `trackit transaction update <id> [--account <account>] [--date <date>] [--amount <amount>] [--description <desc>] [--reference <ref>] [--category <category>] [--notes <notes>]` - Update transaction fields
 - `trackit transaction delete <id>` - Delete a transaction
 
-**Note**: Account can be specified by name or ID in most commands. Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.
+**Note**: Account can be specified by name or ID in most commands. Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc. Period options (`--this-month`, `--last-year`, etc.) provide convenient shortcuts for common date ranges and cannot be combined with `--start-date` or `--end-date`.
 
 ### Category Management
 
@@ -161,7 +165,7 @@ pip install -e .
 
 ### Analysis
 
-- `trackit summary [--start-date <date>] [--end-date <date>] [--category <path>] [--include-transfers] [--expand]` - Show category summary
+- `trackit summary [--start-date <date>] [--end-date <date>] [--this-month] [--this-year] [--this-week] [--last-month] [--last-year] [--last-week] [--category <path>] [--include-transfers] [--expand]` - Show category summary
 
 The summary command displays category totals in a single "Total" column (net total: income + expenses). Categories are grouped by type: Income categories are shown first with an Income subtotal, followed by Expense categories with an Expense subtotal, and finally the overall total. By default, it shows top-level categories. Use `--expand` to show the full category tree with indented subtotals for each category level. Transfer type categories are excluded by default unless `--include-transfers` is used.
 
@@ -173,14 +177,23 @@ trackit summary
 # Summary for a specific date range
 trackit summary --start-date 2024-01-01 --end-date 2024-01-31
 
+# Summary for current month using period option
+trackit summary --this-month
+
+# Summary for previous year
+trackit summary --last-year
+
 # Expanded view showing full category tree with indentation
 trackit summary --expand
 
 # Expanded view for a specific category
 trackit summary --category "Food & Dining" --expand
+
+# Summary for last month with expanded view
+trackit summary --last-month --expand
 ```
 
-**Note**: Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc.
+**Note**: Dates support relative formats like `today`, `yesterday`, `last month`, `this year`, etc. Period options (`--this-month`, `--this-year`, `--this-week`, `--last-month`, `--last-year`, `--last-week`) provide convenient shortcuts for common date ranges. Only one period option can be specified at a time, and they cannot be combined with `--start-date` or `--end-date`.
 
 ## Database
 
@@ -310,9 +323,15 @@ The date parser supports relative dates for easier filtering:
 
 Examples:
 ```bash
+# Using relative date strings
 trackit transaction list --start-date "last month" --end-date "today"
 trackit summary --start-date "this year"
 trackit add --account "Chase" --date "yesterday" --amount -25.00
+
+# Using period options (convenient shortcuts)
+trackit transaction list --this-month
+trackit summary --last-year
+trackit transaction list --this-week --category "Food & Dining"
 ```
 
 ### Uncategorized Transactions
