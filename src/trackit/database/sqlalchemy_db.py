@@ -90,7 +90,9 @@ class SQLAlchemyDatabase(Database):
         accounts = session.query(Account).order_by(Account.name).all()
         return [account_to_domain(acc) for acc in accounts]
 
-    def update_account_name(self, account_id: int, name: str, bank_name: Optional[str] = None) -> None:
+    def update_account_name(
+        self, account_id: int, name: str, bank_name: Optional[str] = None
+    ) -> None:
         """Update account name and optionally bank name."""
         session = self._get_session()
         account = session.query(Account).filter(Account.id == account_id).first()
@@ -98,7 +100,11 @@ class SQLAlchemyDatabase(Database):
             raise ValueError(f"Account {account_id} not found")
 
         # Check for duplicate name (excluding current account)
-        existing = session.query(Account).filter(Account.name == name, Account.id != account_id).first()
+        existing = (
+            session.query(Account)
+            .filter(Account.name == name, Account.id != account_id)
+            .first()
+        )
         if existing is not None:
             raise ValueError(f"Account with name '{name}' already exists")
 
@@ -115,16 +121,26 @@ class SQLAlchemyDatabase(Database):
             raise ValueError(f"Account {account_id} not found")
 
         # Check for associated transactions
-        transaction_count = session.query(Transaction).filter(Transaction.account_id == account_id).count()
+        transaction_count = (
+            session.query(Transaction)
+            .filter(Transaction.account_id == account_id)
+            .count()
+        )
         # Check for associated formats
-        format_count = session.query(CSVFormat).filter(CSVFormat.account_id == account_id).count()
+        format_count = (
+            session.query(CSVFormat).filter(CSVFormat.account_id == account_id).count()
+        )
 
         if transaction_count > 0 or format_count > 0:
             parts = []
             if transaction_count > 0:
-                parts.append(f"{transaction_count} transaction{'s' if transaction_count != 1 else ''}")
+                parts.append(
+                    f"{transaction_count} transaction{'s' if transaction_count != 1 else ''}"
+                )
             if format_count > 0:
-                parts.append(f"{format_count} CSV format{'s' if format_count != 1 else ''}")
+                parts.append(
+                    f"{format_count} CSV format{'s' if format_count != 1 else ''}"
+                )
             raise ValueError(
                 f"Cannot delete account {account_id}: it has {', '.join(parts)}. "
                 f"Please reassign or delete them first."
@@ -136,12 +152,18 @@ class SQLAlchemyDatabase(Database):
     def get_account_transaction_count(self, account_id: int) -> int:
         """Get count of transactions associated with an account."""
         session = self._get_session()
-        return session.query(Transaction).filter(Transaction.account_id == account_id).count()
+        return (
+            session.query(Transaction)
+            .filter(Transaction.account_id == account_id)
+            .count()
+        )
 
     def get_account_format_count(self, account_id: int) -> int:
         """Get count of CSV formats associated with an account."""
         session = self._get_session()
-        return session.query(CSVFormat).filter(CSVFormat.account_id == account_id).count()
+        return (
+            session.query(CSVFormat).filter(CSVFormat.account_id == account_id).count()
+        )
 
     # CSV Format operations
     def create_csv_format(
@@ -181,7 +203,9 @@ class SQLAlchemyDatabase(Database):
             return None
         return csv_format_to_domain(fmt)
 
-    def list_csv_formats(self, account_id: Optional[int] = None) -> list[DomainCSVFormat]:
+    def list_csv_formats(
+        self, account_id: Optional[int] = None
+    ) -> list[DomainCSVFormat]:
         """List CSV formats, optionally filtered by account."""
         session = self._get_session()
         query = session.query(CSVFormat)
@@ -192,7 +216,11 @@ class SQLAlchemyDatabase(Database):
 
     # CSV Column Mapping operations
     def add_column_mapping(
-        self, format_id: int, csv_column_name: str, db_field_name: str, is_required: bool = False
+        self,
+        format_id: int,
+        csv_column_name: str,
+        db_field_name: str,
+        is_required: bool = False,
     ) -> int:
         """Add a column mapping to a CSV format. Returns mapping ID."""
         session = self._get_session()
@@ -234,7 +262,11 @@ class SQLAlchemyDatabase(Database):
 
         if name is not None:
             # Check for duplicate name (excluding current format)
-            existing = session.query(CSVFormat).filter(CSVFormat.name == name, CSVFormat.id != format_id).first()
+            existing = (
+                session.query(CSVFormat)
+                .filter(CSVFormat.name == name, CSVFormat.id != format_id)
+                .first()
+            )
             if existing is not None:
                 raise ValueError(f"CSV format with name '{name}' already exists")
             fmt.name = name
@@ -263,7 +295,12 @@ class SQLAlchemyDatabase(Database):
         session.commit()
 
     # Category operations
-    def create_category(self, name: str, parent_id: Optional[int] = None, category_type: Optional[int] = None) -> int:
+    def create_category(
+        self,
+        name: str,
+        parent_id: Optional[int] = None,
+        category_type: Optional[int] = None,
+    ) -> int:
         """Create a category. Returns category ID."""
         session = self._get_session()
         # Default to Expense (0) if not specified
@@ -323,7 +360,9 @@ class SQLAlchemyDatabase(Database):
         session = self._get_session()
         all_categories = session.query(Category).order_by(Category.name).all()
 
-        def build_tree(categories: list[Category], parent_id: Optional[int] = None) -> list[dict[str, Any]]:
+        def build_tree(
+            categories: list[Category], parent_id: Optional[int] = None
+        ) -> list[dict[str, Any]]:
             result = []
             for cat in categories:
                 if cat.parent_id == parent_id:
@@ -374,7 +413,9 @@ class SQLAlchemyDatabase(Database):
     def get_transaction(self, transaction_id: int) -> Optional[DomainTransaction]:
         """Get transaction by ID."""
         session = self._get_session()
-        txn = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        txn = (
+            session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        )
         if txn is None:
             return None
         return transaction_to_domain(txn)
@@ -384,24 +425,34 @@ class SQLAlchemyDatabase(Database):
         session = self._get_session()
         count = (
             session.query(Transaction)
-            .filter(Transaction.account_id == account_id, Transaction.unique_id == unique_id)
+            .filter(
+                Transaction.account_id == account_id, Transaction.unique_id == unique_id
+            )
             .count()
         )
         return count > 0
 
-    def update_transaction_category(self, transaction_id: int, category_id: Optional[int]) -> None:
+    def update_transaction_category(
+        self, transaction_id: int, category_id: Optional[int]
+    ) -> None:
         """Update transaction category."""
         session = self._get_session()
-        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        transaction = (
+            session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        )
         if transaction is None:
             raise ValueError(f"Transaction {transaction_id} not found")
         transaction.category_id = category_id
         session.commit()
 
-    def update_transaction_notes(self, transaction_id: int, notes: Optional[str]) -> None:
+    def update_transaction_notes(
+        self, transaction_id: int, notes: Optional[str]
+    ) -> None:
         """Update transaction notes."""
         session = self._get_session()
-        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        transaction = (
+            session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        )
         if transaction is None:
             raise ValueError(f"Transaction {transaction_id} not found")
         transaction.notes = notes
@@ -425,7 +476,9 @@ class SQLAlchemyDatabase(Database):
             update_category: If True, update category_id even if it's None (to clear it)
         """
         session = self._get_session()
-        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        transaction = (
+            session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        )
         if transaction is None:
             raise ValueError(f"Transaction {transaction_id} not found")
 
@@ -451,7 +504,9 @@ class SQLAlchemyDatabase(Database):
     def delete_transaction(self, transaction_id: int) -> None:
         """Delete a transaction."""
         session = self._get_session()
-        transaction = session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        transaction = (
+            session.query(Transaction).filter(Transaction.id == transaction_id).first()
+        )
         if transaction is None:
             raise ValueError(f"Transaction {transaction_id} not found")
         session.delete(transaction)
@@ -480,7 +535,48 @@ class SQLAlchemyDatabase(Database):
         if account_id is not None:
             query = query.filter(Transaction.account_id == account_id)
 
-        transactions = query.order_by(Transaction.date.desc(), Transaction.id.desc()).all()
+        transactions = query.order_by(
+            Transaction.date.desc(), Transaction.id.desc()
+        ).all()
+        return [transaction_to_domain(txn) for txn in transactions]
+
+    def get_summary_transactions(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category_id: Optional[int] = None,
+        include_transfers: bool = False,
+    ) -> list[DomainTransaction]:
+        """Get transactions for summary views."""
+        session = self._get_session()
+        query = session.query(Transaction)
+
+        if start_date is not None:
+            query = query.filter(Transaction.date >= start_date)
+        if end_date is not None:
+            query = query.filter(Transaction.date <= end_date)
+        if category_id is not None:
+            descendant_ids = self._get_all_descendant_ids(category_id)
+            query = query.filter(Transaction.category_id.in_(descendant_ids))
+        if not include_transfers:
+            transfer_categories = (
+                session.query(Category).filter(Category.category_type == 2).all()
+            )
+            transfer_ids = set()
+            for cat in transfer_categories:
+                transfer_ids.update(self._get_all_descendant_ids(cat.id))
+
+            if transfer_ids:
+                query = query.filter(
+                    or_(
+                        Transaction.category_id.is_(None),
+                        ~Transaction.category_id.in_(transfer_ids),
+                    )
+                )
+
+        transactions = query.order_by(
+            Transaction.date.desc(), Transaction.id.desc()
+        ).all()
         return [transaction_to_domain(txn) for txn in transactions]
 
     def _get_top_level_category_id(self, category_id: int) -> Optional[int]:
@@ -518,7 +614,9 @@ class SQLAlchemyDatabase(Database):
         result = {category_id}
 
         def collect_children(parent_id: int):
-            children = session.query(Category).filter(Category.parent_id == parent_id).all()
+            children = (
+                session.query(Category).filter(Category.parent_id == parent_id).all()
+            )
             for child in children:
                 result.add(child.id)
                 collect_children(child.id)
@@ -536,11 +634,16 @@ class SQLAlchemyDatabase(Database):
             List of immediate child category IDs
         """
         session = self._get_session()
-        children = session.query(Category).filter(Category.parent_id == category_id).all()
+        children = (
+            session.query(Category).filter(Category.parent_id == category_id).all()
+        )
         return [child.id for child in children]
 
     def _get_group_id_for_transaction(
-        self, txn: DomainTransaction, category_id: Optional[int], immediate_children_ids: Optional[set[int]]
+        self,
+        txn: DomainTransaction,
+        category_id: Optional[int],
+        immediate_children_ids: Optional[set[int]],
     ) -> Optional[int]:
         """Determine the group ID for a transaction based on the grouping strategy.
 
@@ -607,7 +710,9 @@ class SQLAlchemyDatabase(Database):
         )
 
         for txn in transactions:
-            group_id = self._get_group_id_for_transaction(txn, category_id, immediate_children_ids)
+            group_id = self._get_group_id_for_transaction(
+                txn, category_id, immediate_children_ids
+            )
             summary_dict[group_id]["expenses"] += float(min(txn.amount, 0))
             summary_dict[group_id]["income"] += float(max(txn.amount, 0))
             summary_dict[group_id]["count"] += 1
@@ -615,7 +720,9 @@ class SQLAlchemyDatabase(Database):
         return summary_dict
 
     def _convert_summary_to_results(
-        self, summary_dict: dict[Optional[int], dict[str, Any]], category_id: Optional[int]
+        self,
+        summary_dict: dict[Optional[int], dict[str, Any]],
+        category_id: Optional[int],
     ) -> list[dict[str, Any]]:
         """Convert aggregated summary dictionary to result list with category names.
 
@@ -631,7 +738,9 @@ class SQLAlchemyDatabase(Database):
         # Get parent category name if grouping by subcategories
         parent_name = None
         if category_id is not None:
-            parent_cat = session.query(Category).filter(Category.id == category_id).first()
+            parent_cat = (
+                session.query(Category).filter(Category.id == category_id).first()
+            )
             parent_name = parent_cat.name if parent_cat else "Unknown"
 
         results = []
@@ -642,7 +751,11 @@ class SQLAlchemyDatabase(Database):
                 category_name = parent_name or "Unknown"
             else:
                 cat = session.query(Category).filter(Category.id == group_id).first()
-                category_name = cat.name if cat else ("Uncategorized" if category_id is None else "Unknown")
+                category_name = (
+                    cat.name
+                    if cat
+                    else ("Uncategorized" if category_id is None else "Unknown")
+                )
 
             # Get category type for the category (None for uncategorized)
             category_type = None
@@ -651,14 +764,16 @@ class SQLAlchemyDatabase(Database):
                 if cat:
                     category_type = cat.category_type
 
-            results.append({
-                "category_id": group_id,
-                "category_name": category_name,
-                "category_type": category_type,
-                "expenses": data["expenses"],
-                "income": data["income"],
-                "count": data["count"],
-            })
+            results.append(
+                {
+                    "category_id": group_id,
+                    "category_name": category_name,
+                    "category_type": category_type,
+                    "expenses": data["expenses"],
+                    "income": data["income"],
+                    "count": data["count"],
+                }
+            )
 
         return results
 
@@ -694,7 +809,9 @@ class SQLAlchemyDatabase(Database):
         # Filter out Transfer type category transactions if not including transfers
         if not include_transfers:
             # Get all categories with type 2 (Transfer) and their descendants
-            transfer_categories = session.query(Category).filter(Category.category_type == 2).all()
+            transfer_categories = (
+                session.query(Category).filter(Category.category_type == 2).all()
+            )
             transfer_ids = set()
             for cat in transfer_categories:
                 transfer_ids.update(self._get_all_descendant_ids(cat.id))
@@ -702,11 +819,13 @@ class SQLAlchemyDatabase(Database):
             if transfer_ids:
                 # Exclude transfer categories, but include uncategorized (None) transactions
                 query = query.filter(
-                    or_(Transaction.category_id.is_(None), ~Transaction.category_id.in_(transfer_ids))
+                    or_(
+                        Transaction.category_id.is_(None),
+                        ~Transaction.category_id.in_(transfer_ids),
+                    )
                 )
 
         # Get transactions and aggregate
         transactions = query.all()
         summary_dict = self._aggregate_transactions_by_group(transactions, category_id)
         return self._convert_summary_to_results(summary_dict, category_id)
-
