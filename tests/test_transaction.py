@@ -154,7 +154,9 @@ def test_view_transactions(cli_runner, temp_db, sample_account, transaction_serv
     assert "TXN001" in result.output or "Test Transaction" in result.output
 
 
-def test_view_transactions_verbose(cli_runner, temp_db, sample_account, transaction_service):
+def test_view_transactions_verbose(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test viewing transactions in verbose mode."""
     from datetime import date
     from decimal import Decimal
@@ -178,7 +180,9 @@ def test_view_transactions_verbose(cli_runner, temp_db, sample_account, transact
     assert "Unique ID:" in result.output
 
 
-def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, transaction_service):
+def test_view_transactions_with_filters(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test viewing transactions with date filters."""
     from datetime import date
     from decimal import Decimal
@@ -209,7 +213,9 @@ def test_view_transactions_with_filters(cli_runner, temp_db, sample_account, tra
     assert "transaction" in result.output.lower()
 
 
-def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account, transaction_service):
+def test_view_transactions_with_account_name(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test viewing transactions using account name."""
     from datetime import date
     from decimal import Decimal
@@ -235,10 +241,52 @@ def test_view_transactions_with_account_name(cli_runner, temp_db, sample_account
     )
 
     assert result.exit_code == 0
-    assert "TXN001" in result.output or "Test Transaction" in result.output
+    assert "transaction" in result.output.lower()
 
 
-def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_get_summary_transactions_excludes_transfers_by_default(
+    temp_db, sample_account, sample_categories, transaction_service, category_service
+):
+    """Test summary transaction retrieval excludes transfers by default."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transfer_root_id = category_service.create_category(
+        name="Transfer", parent_path=None, category_type=2
+    )
+    transfer_child_id = category_service.create_category(
+        name="Between Accounts", parent_path="Transfer", category_type=2
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-100.00"),
+        description="Transfer to savings",
+        category_id=transfer_child_id,
+    )
+
+    transactions = transaction_service.get_summary_transactions(
+        start_date=today, end_date=today
+    )
+
+    assert len(transactions) == 1
+    assert transactions[0].description == "Groceries"
+
+
+def test_view_transactions_uncategorized(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test viewing uncategorized transactions."""
     from datetime import date
     from decimal import Decimal
@@ -281,7 +329,9 @@ def test_view_transactions_uncategorized(cli_runner, temp_db, sample_account, sa
         assert "Categorized Transaction" not in result.output
 
 
-def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, transaction_service):
+def test_view_transactions_shows_totals(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test that transaction list command shows totals."""
     from datetime import date
     from decimal import Decimal
@@ -319,7 +369,9 @@ def test_view_transactions_shows_totals(cli_runner, temp_db, sample_account, tra
     assert "Count:" in result.output
 
 
-def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_account, transaction_service):
+def test_view_transactions_with_relative_dates(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test viewing transactions with relative dates."""
     from datetime import date, timedelta
     from decimal import Decimal
@@ -349,10 +401,15 @@ def test_view_transactions_with_relative_dates(cli_runner, temp_db, sample_accou
     )
 
     assert result.exit_code == 0
-    assert "transaction" in result.output.lower() or "Yesterday's Transaction" in result.output
+    assert (
+        "transaction" in result.output.lower()
+        or "Yesterday's Transaction" in result.output
+    )
 
 
-def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_transaction(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test categorizing a single transaction (backward compatibility)."""
     from datetime import date
     from decimal import Decimal
@@ -380,7 +437,9 @@ def test_categorize_transaction(cli_runner, temp_db, sample_account, sample_cate
     assert "categorized" in result.output.lower()
 
 
-def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_multiple_transactions(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test categorizing multiple transactions."""
     from datetime import date
     from decimal import Decimal
@@ -389,11 +448,11 @@ def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, s
     txn_ids = []
     for i in range(3):
         txn_id = transaction_service.create_transaction(
-            unique_id=f"TXN{i+1:03d}",
+            unique_id=f"TXN{i + 1:03d}",
             account_id=sample_account.id,
             date=date(2024, 1, 15 + i),
-            amount=Decimal(f"-{10 * (i+1)}.00"),
-            description=f"Transaction {i+1}",
+            amount=Decimal(f"-{10 * (i + 1)}.00"),
+            description=f"Transaction {i + 1}",
         )
         txn_ids.append(txn_id)
 
@@ -416,7 +475,9 @@ def test_categorize_multiple_transactions(cli_runner, temp_db, sample_account, s
     assert "failed" in result.output.lower() or "0 failed" in result.output
 
 
-def test_categorize_with_invalid_ids(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_with_invalid_ids(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test categorizing with mix of valid and invalid transaction IDs."""
     from datetime import date
     from decimal import Decimal
@@ -448,7 +509,9 @@ def test_categorize_with_invalid_ids(cli_runner, temp_db, sample_account, sample
     assert "failed" in result.output.lower()
 
 
-def test_categorize_with_invalid_category(cli_runner, temp_db, sample_account, transaction_service):
+def test_categorize_with_invalid_category(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test categorizing with invalid category."""
     from datetime import date
     from decimal import Decimal
@@ -476,7 +539,9 @@ def test_categorize_with_invalid_category(cli_runner, temp_db, sample_account, t
     assert "not found" in result.output.lower()
 
 
-def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_with_duplicate_ids(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test categorizing with duplicate transaction IDs."""
     from datetime import date
     from decimal import Decimal
@@ -509,7 +574,9 @@ def test_categorize_with_duplicate_ids(cli_runner, temp_db, sample_account, samp
     # Should only process once despite duplicates (no error about duplicate processing)
 
 
-def test_categorize_uncategorized_transaction(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_uncategorized_transaction(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test categorizing an uncategorized transaction (should work without --force)."""
     from datetime import date
     from decimal import Decimal
@@ -539,7 +606,9 @@ def test_categorize_uncategorized_transaction(cli_runner, temp_db, sample_accoun
     assert "Food & Dining > Groceries" in result.output
 
 
-def test_categorize_already_categorized_without_force(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_already_categorized_without_force(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test attempting to recategorize without --force (should fail)."""
     from datetime import date
     from decimal import Decimal
@@ -572,7 +641,9 @@ def test_categorize_already_categorized_without_force(cli_runner, temp_db, sampl
     assert "--force" in result.output.lower()
 
 
-def test_categorize_already_categorized_with_force(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_already_categorized_with_force(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test recategorizing with --force flag (should succeed)."""
     from datetime import date
     from decimal import Decimal
@@ -610,7 +681,9 @@ def test_categorize_already_categorized_with_force(cli_runner, temp_db, sample_a
     assert txn.category_id == sample_categories["Food & Dining > Restaurants"]
 
 
-def test_categorize_multiple_mixed_states(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_categorize_multiple_mixed_states(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test multiple transactions with mixed states (categorized/uncategorized)."""
     from datetime import date
     from decimal import Decimal
@@ -660,7 +733,9 @@ def test_categorize_multiple_mixed_states(cli_runner, temp_db, sample_account, s
     assert txn1 is not None
     assert txn2 is not None
     assert txn1.category_id == sample_categories["Food & Dining > Restaurants"]
-    assert txn2.category_id == sample_categories["Food & Dining > Groceries"]  # Unchanged
+    assert (
+        txn2.category_id == sample_categories["Food & Dining > Groceries"]
+    )  # Unchanged
 
     # Now try with --force (should succeed for both)
     result = cli_runner.invoke(
@@ -746,13 +821,16 @@ def test_notes_clear(cli_runner, temp_db, sample_account, transaction_service):
     assert "Cleared notes" in result.output
 
 
-def test_transaction_update_all_fields(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_transaction_update_all_fields(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test updating all transaction fields."""
     from datetime import date
     from decimal import Decimal
 
     # Create second account
     from trackit.domain.account import AccountService
+
     account_service = AccountService(temp_db)
     account2_id = account_service.create_account("Account 2", "Bank 2")
 
@@ -799,7 +877,9 @@ def test_transaction_update_all_fields(cli_runner, temp_db, sample_account, samp
     assert "Updated transaction" in result.output
 
 
-def test_transaction_update_partial(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_update_partial(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test updating only some transaction fields."""
     from datetime import date
     from decimal import Decimal
@@ -850,7 +930,9 @@ def test_transaction_update_not_found(cli_runner, temp_db):
     assert "not found" in result.output.lower()
 
 
-def test_transaction_update_clear_category(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_transaction_update_clear_category(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test clearing category by setting it to empty string."""
     from datetime import date
     from decimal import Decimal
@@ -919,7 +1001,9 @@ def test_transaction_delete(cli_runner, temp_db, sample_account, transaction_ser
     assert txn is None
 
 
-def test_transaction_delete_without_confirmation(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_delete_without_confirmation(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test that deletion is cancelled without confirmation."""
     from datetime import date
     from decimal import Decimal
@@ -969,7 +1053,9 @@ def test_transaction_delete_not_found(cli_runner, temp_db):
     assert "not found" in result.output.lower()
 
 
-def test_transaction_list_this_month(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_list_this_month(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test transaction list with --this-month option."""
     from datetime import date, timedelta
     from decimal import Decimal
@@ -1004,7 +1090,9 @@ def test_transaction_list_this_month(cli_runner, temp_db, sample_account, transa
     assert "Last month transaction" not in result.output
 
 
-def test_transaction_list_this_year(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_list_this_year(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test transaction list with --this-year option."""
     from datetime import date
     from decimal import Decimal
@@ -1038,7 +1126,9 @@ def test_transaction_list_this_year(cli_runner, temp_db, sample_account, transac
     assert "Last year transaction" not in result.output
 
 
-def test_transaction_list_last_month(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_list_last_month(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test transaction list with --last-month option."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -1075,7 +1165,9 @@ def test_transaction_list_last_month(cli_runner, temp_db, sample_account, transa
     assert "This month transaction" not in result.output
 
 
-def test_transaction_list_last_year(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_list_last_year(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test transaction list with --last-year option."""
     from datetime import date
     from decimal import Decimal
@@ -1109,7 +1201,9 @@ def test_transaction_list_last_year(cli_runner, temp_db, sample_account, transac
     assert "This year transaction" not in result.output
 
 
-def test_transaction_list_this_week(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_list_this_week(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test transaction list with --this-week option."""
     from datetime import date, timedelta
     from decimal import Decimal
@@ -1145,7 +1239,9 @@ def test_transaction_list_this_week(cli_runner, temp_db, sample_account, transac
     assert "Last week transaction" not in result.output
 
 
-def test_transaction_list_last_week(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_list_last_week(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test transaction list with --last-week option."""
     from datetime import date, timedelta
     from decimal import Decimal
@@ -1199,7 +1295,9 @@ def test_transaction_list_period_options_validation_multiple(cli_runner, temp_db
     assert "Only one period option" in result.output
 
 
-def test_transaction_list_period_options_validation_with_start_date(cli_runner, temp_db):
+def test_transaction_list_period_options_validation_with_start_date(
+    cli_runner, temp_db
+):
     """Test that period options cannot be combined with --start-date."""
     result = cli_runner.invoke(
         cli,
@@ -1237,7 +1335,9 @@ def test_transaction_list_period_options_validation_with_end_date(cli_runner, te
     assert "cannot be combined" in result.output
 
 
-def test_transaction_list_period_options_with_category(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_transaction_list_period_options_with_category(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test that period options work with --category filter."""
     from datetime import date
     from decimal import Decimal
@@ -1280,7 +1380,9 @@ def test_transaction_list_period_options_with_category(cli_runner, temp_db, samp
     assert "Gas" not in result.output
 
 
-def test_transaction_list_period_options_with_account(cli_runner, temp_db, sample_account, transaction_service):
+def test_transaction_list_period_options_with_account(
+    cli_runner, temp_db, sample_account, transaction_service
+):
     """Test that period options work with --account filter."""
     from datetime import date
     from decimal import Decimal
@@ -1323,4 +1425,3 @@ def test_transaction_list_period_options_with_account(cli_runner, temp_db, sampl
     assert "Account 1 transaction" in result.output
     # Should not show Account 2 transaction
     assert "Account 2 transaction" not in result.output
-

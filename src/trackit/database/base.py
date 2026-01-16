@@ -50,7 +50,9 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def update_account_name(self, account_id: int, name: str, bank_name: Optional[str] = None) -> None:
+    def update_account_name(
+        self, account_id: int, name: str, bank_name: Optional[str] = None
+    ) -> None:
         """Update account name and optionally bank name.
 
         Args:
@@ -138,7 +140,11 @@ class Database(ABC):
     # CSV Column Mapping operations
     @abstractmethod
     def add_column_mapping(
-        self, format_id: int, csv_column_name: str, db_field_name: str, is_required: bool = False
+        self,
+        format_id: int,
+        csv_column_name: str,
+        db_field_name: str,
+        is_required: bool = False,
     ) -> int:
         """Add a column mapping to a CSV format. Returns mapping ID."""
         pass
@@ -187,7 +193,12 @@ class Database(ABC):
 
     # Category operations
     @abstractmethod
-    def create_category(self, name: str, parent_id: Optional[int] = None, category_type: Optional[int] = None) -> int:
+    def create_category(
+        self,
+        name: str,
+        parent_id: Optional[int] = None,
+        category_type: Optional[int] = None,
+    ) -> int:
         """Create a category. Returns category ID.
 
         Args:
@@ -248,12 +259,16 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def update_transaction_category(self, transaction_id: int, category_id: Optional[int]) -> None:
+    def update_transaction_category(
+        self, transaction_id: int, category_id: Optional[int]
+    ) -> None:
         """Update transaction category."""
         pass
 
     @abstractmethod
-    def update_transaction_notes(self, transaction_id: int, notes: Optional[str]) -> None:
+    def update_transaction_notes(
+        self, transaction_id: int, notes: Optional[str]
+    ) -> None:
         """Update transaction notes."""
         pass
 
@@ -321,6 +336,20 @@ class Database(ABC):
         pass
 
     @abstractmethod
+    def get_summary_transactions(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category_id: Optional[int] = None,
+        include_transfers: bool = False,
+    ) -> list[Transaction]:
+        """Get transactions for summary views.
+
+        Includes descendant categories when category_id is provided.
+        """
+        pass
+
+    @abstractmethod
     def get_category_summary(
         self,
         start_date: Optional[date] = None,
@@ -334,4 +363,3 @@ class Database(ABC):
         expenses, income, count). This structure is kept as dict for aggregation results.
         """
         pass
-

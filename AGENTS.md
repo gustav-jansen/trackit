@@ -76,5 +76,6 @@ uv run pytest tests/
 - Documentation must be updated for user-visible changes.
 - If in doubt, stop and ask rather than guessing.
 - Prefer small, reviewable changes.
+- Always make sure that tests pass before a task is complete.
 
 ---

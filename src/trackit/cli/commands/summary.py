@@ -3,61 +3,69 @@
 import click
 from trackit.domain.transaction import TransactionService
 from trackit.domain.category import CategoryService
-from trackit.utils.date_parser import parse_date, get_date_range, get_last_six_months_range
+from trackit.utils.date_parser import (
+    parse_date,
+    get_date_range,
+    get_last_six_months_range,
+)
 
 
-def _get_filtered_transactions(db, start_date, end_date, category_path, include_transfers):
-    """Get filtered transactions matching the summary criteria."""
-    from trackit.database.sqlalchemy_db import SQLAlchemyDatabase
-    from sqlalchemy import or_
-    from trackit.database.models import Transaction, Category
+def _build_descendant_map(category_tree):
+    """Build map of category IDs to descendant ID sets."""
+    descendant_map = {}
 
-    # Access SQLAlchemy database methods for filtering
-    if not isinstance(db, SQLAlchemyDatabase):
-        raise ValueError("Database must be SQLAlchemyDatabase")
+    def collect_descendants(node):
+        descendants = {node["id"]}
+        for child in node.get("children", []):
+            descendants.update(collect_descendants(child))
+        descendant_map[node["id"]] = descendants
+        return descendants
 
-    session = db._get_session()
-    query = session.query(Transaction)
+    for root in category_tree or []:
+        collect_descendants(root)
 
-    # Apply date filters
-    if start_date is not None:
-        query = query.filter(Transaction.date >= start_date)
-    if end_date is not None:
-        query = query.filter(Transaction.date <= end_date)
-
-    # Apply category filter if specified
-    if category_path is not None:
-        category = db.get_category_by_path(category_path)
-        if category is not None:
-            descendant_ids = db._get_all_descendant_ids(category.id)
-            query = query.filter(Transaction.category_id.in_(descendant_ids))
-
-    # Filter out Transfer type category transactions if not including transfers
-    if not include_transfers:
-        # Get all categories with type 2 (Transfer) and their descendants
-        transfer_categories = session.query(Category).filter(Category.category_type == 2).all()
-        transfer_ids = set()
-        for cat in transfer_categories:
-            transfer_ids.update(db._get_all_descendant_ids(cat.id))
-
-        if transfer_ids:
-            # Exclude transfer categories, but include uncategorized (None) transactions
-            query = query.filter(
-                or_(Transaction.category_id.is_(None), ~Transaction.category_id.in_(transfer_ids))
-            )
-
-    return query.all()
+    return descendant_map
 
 
-def _calculate_category_total(db, category_id, transactions):
+def _build_category_tree(db, category_service, category_path):
+    """Build category tree, filtered by category path if provided."""
+    if category_path:
+        category_obj = db.get_category_by_path(category_path)
+        if category_obj:
+
+            def build_subtree(cat_id):
+                cat = db.get_category(cat_id)
+                if cat is None:
+                    return None
+                children = category_service.list_categories(parent_id=cat_id)
+                child_trees = [build_subtree(child.id) for child in children]
+                child_trees = [ct for ct in child_trees if ct is not None]
+                return {
+                    "id": cat.id,
+                    "name": cat.name,
+                    "parent_id": cat.parent_id,
+                    "category_type": cat.category_type,
+                    "created_at": cat.created_at,
+                    "children": child_trees,
+                }
+
+            subtree = build_subtree(category_obj.id)
+            return [subtree] if subtree else []
+        return []
+
+    return category_service.get_category_tree()
+
+
+def _calculate_category_total(descendant_map, category_id, transactions):
     """Calculate total for a category including all its descendants."""
     if category_id is None:
         # Uncategorized transactions
         return sum(float(txn.amount) for txn in transactions if txn.category_id is None)
 
-    # Get all descendant IDs including the category itself
-    descendant_ids = db._get_all_descendant_ids(category_id)
-    return sum(float(txn.amount) for txn in transactions if txn.category_id in descendant_ids)
+    descendant_ids = descendant_map.get(category_id, {category_id})
+    return sum(
+        float(txn.amount) for txn in transactions if txn.category_id in descendant_ids
+    )
 
 
 def _get_category_type(db, category_id):
@@ -68,11 +76,23 @@ def _get_category_type(db, category_id):
     return cat.category_type if cat else None
 
 
+def _get_filtered_transactions(
+    service, start_date, end_date, category_path, include_transfers
+):
+    """Get filtered transactions matching the summary criteria."""
+    return service.get_summary_transactions(
+        start_date=start_date,
+        end_date=end_date,
+        category_path=category_path,
+        include_transfers=include_transfers,
+    )
+
+
 def _get_transactions_by_period(transactions, group_by_month):
     """Group transactions by month or year.
 
     Args:
-        transactions: List of transaction objects (SQLAlchemy models)
+        transactions: List of transaction entities
         group_by_month: If True, group by month; if False, group by year
 
     Returns:
@@ -94,11 +114,13 @@ def _get_transactions_by_period(transactions, group_by_month):
     return dict(period_transactions)
 
 
-def _calculate_category_total_for_period(db, category_id, period_transactions):
+def _calculate_category_total_for_period(
+    descendant_map, category_id, period_transactions
+):
     """Calculate total for a category in a specific period.
 
     Args:
-        db: Database instance
+        descendant_map: Map of category IDs to descendant ID sets
         category_id: Category ID (None for uncategorized)
         period_transactions: List of transactions for the period
 
@@ -107,15 +129,25 @@ def _calculate_category_total_for_period(db, category_id, period_transactions):
     """
     if category_id is None:
         # Uncategorized transactions
-        return sum(float(txn.amount) for txn in period_transactions if txn.category_id is None)
+        return sum(
+            float(txn.amount) for txn in period_transactions if txn.category_id is None
+        )
 
-    # Get all descendant IDs including the category itself
-    descendant_ids = db._get_all_descendant_ids(category_id)
-    return sum(float(txn.amount) for txn in period_transactions if txn.category_id in descendant_ids)
+    descendant_ids = descendant_map.get(category_id, {category_id})
+    return sum(
+        float(txn.amount)
+        for txn in period_transactions
+        if txn.category_id in descendant_ids
+    )
 
 
 def _display_columnar_summary_standard(
-    db, summaries, period_keys, period_transactions_map, include_transfers
+    db,
+    summaries,
+    period_keys,
+    period_transactions_map,
+    include_transfers,
+    descendant_map,
 ):
     """Display columnar summary for standard view.
 
@@ -125,6 +157,7 @@ def _display_columnar_summary_standard(
         period_keys: Sorted list of period keys (e.g., ["2024-01", "2024-02"])
         period_transactions_map: Dict mapping period key to list of transactions
         include_transfers: Whether to include transfers
+        descendant_map: Map of category IDs to descendant ID sets
     """
     # Column widths
     CATEGORY_WIDTH = 50
@@ -151,7 +184,9 @@ def _display_columnar_summary_standard(
         # Calculate total across all periods for this category
         total = sum(
             _calculate_category_total_for_period(
-                db, s.get("category_id"), period_transactions_map.get(period_key, [])
+                descendant_map,
+                s.get("category_id"),
+                period_transactions_map.get(period_key, []),
             )
             for period_key in period_keys
         )
@@ -172,7 +207,9 @@ def _display_columnar_summary_standard(
             -abs(
                 sum(
                     _calculate_category_total_for_period(
-                        db, x.get("category_id"), period_transactions_map.get(period_key, [])
+                        descendant_map,
+                        x.get("category_id"),
+                        period_transactions_map.get(period_key, []),
                     )
                     for period_key in period_keys
                 )
@@ -185,7 +222,9 @@ def _display_columnar_summary_standard(
             -abs(
                 sum(
                     _calculate_category_total_for_period(
-                        db, x.get("category_id"), period_transactions_map.get(period_key, [])
+                        descendant_map,
+                        x.get("category_id"),
+                        period_transactions_map.get(period_key, []),
                     )
                     for period_key in period_keys
                 )
@@ -198,7 +237,9 @@ def _display_columnar_summary_standard(
             -abs(
                 sum(
                     _calculate_category_total_for_period(
-                        db, x.get("category_id"), period_transactions_map.get(period_key, [])
+                        descendant_map,
+                        x.get("category_id"),
+                        period_transactions_map.get(period_key, []),
                     )
                     for period_key in period_keys
                 )
@@ -210,7 +251,9 @@ def _display_columnar_summary_standard(
     # Display Income categories
     if income_summaries:
         click.echo("Income")
-        click.echo("*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
     income_subtotals = [0.0] * len(period_keys)
     for s in income_summaries:
         category_name = s["category_name"] or "Uncategorized"
@@ -218,7 +261,9 @@ def _display_columnar_summary_standard(
         category_id = s.get("category_id")
         for i, period_key in enumerate(period_keys):
             period_txns = period_transactions_map.get(period_key, [])
-            total = _calculate_category_total_for_period(db, category_id, period_txns)
+            total = _calculate_category_total_for_period(
+                descendant_map, category_id, period_txns
+            )
             income_subtotals[i] += total
             if total == 0:
                 row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
@@ -236,13 +281,17 @@ def _display_columnar_summary_standard(
             else:
                 subtotal_row += f"   ${income_subtotals[i]:>13,.2f}"
         click.echo(subtotal_row)
-        click.echo("=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
         click.echo()
 
     # Display Transfer categories
     if transfer_summaries:
         click.echo("Transfer")
-        click.echo("*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
     transfer_subtotals = [0.0] * len(period_keys)
     for s in transfer_summaries:
         category_name = s["category_name"] or "Uncategorized"
@@ -250,7 +299,9 @@ def _display_columnar_summary_standard(
         category_id = s.get("category_id")
         for i, period_key in enumerate(period_keys):
             period_txns = period_transactions_map.get(period_key, [])
-            total = _calculate_category_total_for_period(db, category_id, period_txns)
+            total = _calculate_category_total_for_period(
+                descendant_map, category_id, period_txns
+            )
             transfer_subtotals[i] += total
             if total == 0:
                 row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
@@ -268,13 +319,17 @@ def _display_columnar_summary_standard(
             else:
                 subtotal_row += f"   ${transfer_subtotals[i]:>13,.2f}"
         click.echo(subtotal_row)
-        click.echo("=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
         click.echo()
 
     # Display Expense categories
     if expense_summaries:
         click.echo("Expense")
-        click.echo("*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
     expense_subtotals = [0.0] * len(period_keys)
     for s in expense_summaries:
         category_name = s["category_name"] or "Uncategorized"
@@ -282,7 +337,9 @@ def _display_columnar_summary_standard(
         category_id = s.get("category_id")
         for i, period_key in enumerate(period_keys):
             period_txns = period_transactions_map.get(period_key, [])
-            total = _calculate_category_total_for_period(db, category_id, period_txns)
+            total = _calculate_category_total_for_period(
+                descendant_map, category_id, period_txns
+            )
             expense_subtotals[i] += total
             if total == 0:
                 row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
@@ -300,7 +357,9 @@ def _display_columnar_summary_standard(
             else:
                 subtotal_row += f"   ${expense_subtotals[i]:>13,.2f}"
         click.echo(subtotal_row)
-        click.echo("=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
     else:
         click.echo(separator)
 
@@ -308,7 +367,9 @@ def _display_columnar_summary_standard(
     overall_totals = [0.0] * len(period_keys)
     for period_key in period_keys:
         period_txns = period_transactions_map.get(period_key, [])
-        overall_totals[period_keys.index(period_key)] = sum(float(txn.amount) for txn in period_txns)
+        overall_totals[period_keys.index(period_key)] = sum(
+            float(txn.amount) for txn in period_txns
+        )
 
     total_row = f"{'TOTAL':<{CATEGORY_WIDTH}}"
     for i, period_key in enumerate(period_keys):
@@ -320,7 +381,13 @@ def _display_columnar_summary_standard(
 
 
 def _display_columnar_summary_expanded(
-    db, category_tree, period_keys, period_transactions_map, include_transfers, has_uncategorized
+    db,
+    category_tree,
+    period_keys,
+    period_transactions_map,
+    include_transfers,
+    has_uncategorized,
+    descendant_map,
 ):
     """Display columnar summary for expanded view.
 
@@ -331,6 +398,7 @@ def _display_columnar_summary_expanded(
         period_transactions_map: Dict mapping period key to list of transactions
         include_transfers: Whether to include transfers
         has_uncategorized: Whether there are uncategorized transactions
+        descendant_map: Map of category IDs to descendant ID sets
     """
     # Column widths
     CATEGORY_WIDTH = 50
@@ -369,10 +437,18 @@ def _display_columnar_summary_expanded(
     # Display Income categories
     if income_tree:
         click.echo("Income")
-        click.echo("*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
         income_subtotals = [0.0] * len(period_keys)
         _display_columnar_category_tree(
-            db, income_tree, period_keys, period_transactions_map, indent=1, subtotals=income_subtotals
+            db,
+            income_tree,
+            period_keys,
+            period_transactions_map,
+            descendant_map,
+            1,
+            income_subtotals,
         )
         if any(st != 0 for st in income_subtotals):
             click.echo(separator)
@@ -383,16 +459,26 @@ def _display_columnar_summary_expanded(
                 else:
                     subtotal_row += f"   ${income_subtotals[i]:>13,.2f}"
             click.echo(subtotal_row)
-            click.echo("=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+            click.echo(
+                "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+            )
             click.echo()
 
     # Display Transfer categories
     if transfer_tree:
         click.echo("Transfer")
-        click.echo("*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
         transfer_subtotals = [0.0] * len(period_keys)
         _display_columnar_category_tree(
-            db, transfer_tree, period_keys, period_transactions_map, indent=1, subtotals=transfer_subtotals
+            db,
+            transfer_tree,
+            period_keys,
+            period_transactions_map,
+            descendant_map,
+            1,
+            transfer_subtotals,
         )
         if any(st != 0 for st in transfer_subtotals):
             click.echo(separator)
@@ -403,17 +489,27 @@ def _display_columnar_summary_expanded(
                 else:
                     subtotal_row += f"   ${transfer_subtotals[i]:>13,.2f}"
             click.echo(subtotal_row)
-            click.echo("=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+            click.echo(
+                "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+            )
             click.echo()
 
     # Display Expense categories
     if expense_tree or has_uncategorized:
         click.echo("Expense")
-        click.echo("*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
     expense_subtotals = [0.0] * len(period_keys)
     if expense_tree:
         _display_columnar_category_tree(
-            db, expense_tree, period_keys, period_transactions_map, indent=1, subtotals=expense_subtotals
+            db,
+            expense_tree,
+            period_keys,
+            period_transactions_map,
+            descendant_map,
+            1,
+            expense_subtotals,
         )
 
     # Display uncategorized if present
@@ -424,7 +520,9 @@ def _display_columnar_summary_expanded(
         row = f"{indent_str}{category_name:<{category_width}}"
         for i, period_key in enumerate(period_keys):
             period_txns = period_transactions_map.get(period_key, [])
-            total = _calculate_category_total_for_period(db, None, period_txns)
+            total = _calculate_category_total_for_period(
+                descendant_map, None, period_txns
+            )
             expense_subtotals[i] += total
             if total == 0:
                 row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
@@ -442,13 +540,17 @@ def _display_columnar_summary_expanded(
             else:
                 subtotal_row += f"   ${expense_subtotals[i]:>13,.2f}"
         click.echo(subtotal_row)
-        click.echo("=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3)))
+        click.echo(
+            "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
+        )
 
     # Overall total
     overall_totals = [0.0] * len(period_keys)
     for period_key in period_keys:
         period_txns = period_transactions_map.get(period_key, [])
-        overall_totals[period_keys.index(period_key)] = sum(float(txn.amount) for txn in period_txns)
+        overall_totals[period_keys.index(period_key)] = sum(
+            float(txn.amount) for txn in period_txns
+        )
 
     total_row = f"{'TOTAL':<{CATEGORY_WIDTH}}"
     for i, period_key in enumerate(period_keys):
@@ -460,7 +562,13 @@ def _display_columnar_summary_expanded(
 
 
 def _display_columnar_category_tree(
-    db, category_tree, period_keys, period_transactions_map, indent=0, subtotals=None
+    db,
+    category_tree,
+    period_keys,
+    period_transactions_map,
+    descendant_map,
+    indent=0,
+    subtotals=None,
 ):
     """Recursively display category tree in columnar format.
 
@@ -469,6 +577,7 @@ def _display_columnar_category_tree(
         category_tree: List of category dicts with children
         period_keys: Sorted list of period keys
         period_transactions_map: Dict mapping period key to list of transactions
+        descendant_map: Map of category IDs to descendant ID sets
         indent: Current indent level
         subtotals: List to accumulate subtotals (modified in place)
     """
@@ -483,7 +592,9 @@ def _display_columnar_category_tree(
     def get_sort_key(cat):
         total = sum(
             _calculate_category_total_for_period(
-                db, cat["id"], period_transactions_map.get(period_key, [])
+                descendant_map,
+                cat["id"],
+                period_transactions_map.get(period_key, []),
             )
             for period_key in period_keys
         )
@@ -496,7 +607,9 @@ def _display_columnar_category_tree(
         period_totals = []
         for period_key in period_keys:
             period_txns = period_transactions_map.get(period_key, [])
-            total = _calculate_category_total_for_period(db, cat["id"], period_txns)
+            total = _calculate_category_total_for_period(
+                descendant_map, cat["id"], period_txns
+            )
             period_totals.append(total)
 
         # Skip if all periods are zero
@@ -524,15 +637,24 @@ def _display_columnar_category_tree(
         # Display children recursively
         if cat.get("children"):
             _display_columnar_category_tree(
-                db, cat["children"], period_keys, period_transactions_map, indent + 1, subtotals
+                db,
+                cat["children"],
+                period_keys,
+                period_transactions_map,
+                descendant_map,
+                indent + 1,
+                subtotals,
             )
 
 
-def _display_expanded_summary(db, category_tree, transactions, indent=0, is_first=True):
+def _display_expanded_summary(
+    descendant_map, category_tree, transactions, indent=0, is_first=True
+):
     """Recursively display category tree with totals, sorted by value (highest first)."""
+
     # Sort categories by total value (descending), then by name for ties
     def get_sort_key(cat):
-        total = _calculate_category_total(db, cat["id"], transactions)
+        total = _calculate_category_total(descendant_map, cat["id"], transactions)
         return (-abs(total), cat["name"])  # Negative abs for descending order
 
     sorted_categories = sorted(category_tree, key=get_sort_key)
@@ -541,7 +663,7 @@ def _display_expanded_summary(db, category_tree, transactions, indent=0, is_firs
     INDENT_SIZE = 4
 
     for i, cat in enumerate(sorted_categories):
-        total = _calculate_category_total(db, cat["id"], transactions)
+        total = _calculate_category_total(descendant_map, cat["id"], transactions)
 
         # Skip categories with no transactions (total includes all descendants)
         if total == 0:
@@ -559,16 +681,29 @@ def _display_expanded_summary(db, category_tree, transactions, indent=0, is_firs
         # Amount should move right as indent increases (deeper categories have values more to the right)
         # Base amount position is 20 chars from right, add indent to move it further right
         amount_width = 20 + (INDENT_SIZE * indent)
-        click.echo(f"{indent_str}{category_name:<{category_width}} {total_str:>{amount_width}}")
+        click.echo(
+            f"{indent_str}{category_name:<{category_width}} {total_str:>{amount_width}}"
+        )
 
         # Display children recursively (they will be sorted in the recursive call)
         if cat.get("children"):
-            _display_expanded_summary(db, cat["children"], transactions, indent + 1, is_first=False)
+            _display_expanded_summary(
+                descendant_map,
+                cat["children"],
+                transactions,
+                indent + 1,
+                is_first=False,
+            )
 
 
 @click.command("summary")
-@click.option("--start-date", help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')")
-@click.option("--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')")
+@click.option(
+    "--start-date",
+    help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')",
+)
+@click.option(
+    "--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')"
+)
 @click.option("--this-month", is_flag=True, help="Filter to current month")
 @click.option("--this-year", is_flag=True, help="Filter to current year")
 @click.option("--this-week", is_flag=True, help="Filter to current week")
@@ -576,10 +711,20 @@ def _display_expanded_summary(db, category_tree, transactions, indent=0, is_firs
 @click.option("--last-year", is_flag=True, help="Filter to previous year")
 @click.option("--last-week", is_flag=True, help="Filter to previous week")
 @click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries')")
-@click.option("--include-transfers", is_flag=True, help="Include transactions with Transfer category")
-@click.option("--expand", is_flag=True, help="Expand entire category tree with subtotals")
-@click.option("--group-by-month", is_flag=True, help="Group summary by month in columnar format")
-@click.option("--group-by-year", is_flag=True, help="Group summary by year in columnar format")
+@click.option(
+    "--include-transfers",
+    is_flag=True,
+    help="Include transactions with Transfer category",
+)
+@click.option(
+    "--expand", is_flag=True, help="Expand entire category tree with subtotals"
+)
+@click.option(
+    "--group-by-month", is_flag=True, help="Group summary by month in columnar format"
+)
+@click.option(
+    "--group-by-year", is_flag=True, help="Group summary by year in columnar format"
+)
 @click.pass_context
 def summary(
     ctx,
@@ -602,20 +747,36 @@ def summary(
     service = TransactionService(db)
 
     # Validate period options
-    period_options = [this_month, this_year, this_week, last_month, last_year, last_week]
+    period_options = [
+        this_month,
+        this_year,
+        this_week,
+        last_month,
+        last_year,
+        last_week,
+    ]
     period_count = sum(period_options)
 
     if period_count > 1:
-        click.echo("Error: Only one period option (--this-month, --this-year, --this-week, --last-month, --last-year, --last-week) can be specified at a time.", err=True)
+        click.echo(
+            "Error: Only one period option (--this-month, --this-year, --this-week, --last-month, --last-year, --last-week) can be specified at a time.",
+            err=True,
+        )
         ctx.exit(1)
 
     if period_count > 0 and (start_date or end_date):
-        click.echo("Error: Period options (--this-month, --this-year, etc.) cannot be combined with --start-date or --end-date.", err=True)
+        click.echo(
+            "Error: Period options (--this-month, --this-year, etc.) cannot be combined with --start-date or --end-date.",
+            err=True,
+        )
         ctx.exit(1)
 
     # Validate grouping options
     if group_by_month and group_by_year:
-        click.echo("Error: --group-by-month and --group-by-year cannot be specified at the same time.", err=True)
+        click.echo(
+            "Error: --group-by-month and --group-by-year cannot be specified at the same time.",
+            err=True,
+        )
         ctx.exit(1)
 
     # Set default grouping to month if no grouping option specified
@@ -661,7 +822,9 @@ def summary(
             start, end = get_last_six_months_range()
 
     # Get filtered transactions for overall total calculation
-    filtered_transactions = _get_filtered_transactions(db, start, end, category, include_transfers)
+    filtered_transactions = _get_filtered_transactions(
+        service, start, end, category, include_transfers
+    )
 
     if not filtered_transactions:
         click.echo("No transactions found.")
@@ -670,7 +833,9 @@ def summary(
     # Check if grouping is enabled
     if group_by_month or group_by_year:
         # Group transactions by period
-        period_transactions_map = _get_transactions_by_period(filtered_transactions, group_by_month)
+        period_transactions_map = _get_transactions_by_period(
+            filtered_transactions, group_by_month
+        )
 
         # Get sorted list of period keys (chronologically ascending)
         period_keys = sorted(period_transactions_map.keys())
@@ -682,42 +847,30 @@ def summary(
         if expand:
             # Expanded columnar view
             category_service = CategoryService(db)
+            category_tree = _build_category_tree(db, category_service, category)
+            descendant_map = _build_descendant_map(category_tree)
 
-            # If category filter is specified, only show that category's subtree
-            if category:
-                category_obj = db.get_category_by_path(category)
-                if category_obj:
-                    def build_subtree(cat_id):
-                        cat = db.get_category(cat_id)
-                        if cat is None:
-                            return None
-                        children = category_service.list_categories(parent_id=cat_id)
-                        child_trees = [build_subtree(child.id) for child in children]
-                        child_trees = [ct for ct in child_trees if ct is not None]
-                        return {
-                            "id": cat.id,
-                            "name": cat.name,
-                            "parent_id": cat.parent_id,
-                            "category_type": cat.category_type,
-                            "created_at": cat.created_at,
-                            "children": child_trees
-                        }
-                    category_tree = [build_subtree(category_obj.id)] if build_subtree(category_obj.id) else []
-                else:
-                    category_tree = []
-            else:
-                category_tree = category_service.get_category_tree()
-
-            has_uncategorized = any(txn.category_id is None for txn in filtered_transactions)
+            has_uncategorized = any(
+                txn.category_id is None for txn in filtered_transactions
+            )
 
             click.echo("\nCategory Summary (Expanded):")
             _display_columnar_summary_expanded(
-                db, category_tree, period_keys, period_transactions_map, include_transfers, has_uncategorized
+                db,
+                category_tree,
+                period_keys,
+                period_transactions_map,
+                include_transfers,
+                has_uncategorized,
+                descendant_map,
             )
         else:
             # Standard columnar view
             summaries = service.get_summary(
-                start_date=start, end_date=end, category_path=category, include_transfers=include_transfers
+                start_date=start,
+                end_date=end,
+                category_path=category,
+                include_transfers=include_transfers,
             )
 
             if not summaries:
@@ -725,8 +878,16 @@ def summary(
                 return
 
             click.echo("\nCategory Summary:")
+            category_service = CategoryService(db)
+            category_tree = _build_category_tree(db, category_service, category)
+            descendant_map = _build_descendant_map(category_tree)
             _display_columnar_summary_standard(
-                db, summaries, period_keys, period_transactions_map, include_transfers
+                db,
+                summaries,
+                period_keys,
+                period_transactions_map,
+                include_transfers,
+                descendant_map,
             )
         return
 
@@ -736,35 +897,13 @@ def summary(
     if expand:
         # Expanded view: show full category tree
         category_service = CategoryService(db)
-
-        # If category filter is specified, only show that category's subtree
-        if category:
-            category_obj = db.get_category_by_path(category)
-            if category_obj:
-                # Build subtree starting from the filtered category
-                def build_subtree(cat_id):
-                    cat = db.get_category(cat_id)
-                    if cat is None:
-                        return None
-                    children = category_service.list_categories(parent_id=cat_id)
-                    child_trees = [build_subtree(child.id) for child in children]
-                    child_trees = [ct for ct in child_trees if ct is not None]
-                    return {
-                        "id": cat.id,
-                        "name": cat.name,
-                        "parent_id": cat.parent_id,
-                        "category_type": cat.category_type,
-                        "created_at": cat.created_at,
-                        "children": child_trees
-                    }
-                category_tree = [build_subtree(category_obj.id)] if build_subtree(category_obj.id) else []
-            else:
-                category_tree = []
-        else:
-            category_tree = category_service.get_category_tree()
+        category_tree = _build_category_tree(db, category_service, category)
+        descendant_map = _build_descendant_map(category_tree)
 
         # Also include uncategorized if there are any
-        has_uncategorized = any(txn.category_id is None for txn in filtered_transactions)
+        has_uncategorized = any(
+            txn.category_id is None for txn in filtered_transactions
+        )
 
         click.echo("\nCategory Summary (Expanded):")
         click.echo("-" * 80)
@@ -785,7 +924,9 @@ def summary(
                     cat_type = _get_category_type(db, cat["id"])
                 if cat_type == 1:  # Income
                     income_tree.append(cat)
-                elif cat_type == 2 and include_transfers:  # Transfer (only if including transfers)
+                elif (
+                    cat_type == 2 and include_transfers
+                ):  # Transfer (only if including transfers)
                     transfer_tree.append(cat)
                 else:  # Expense (0) or None
                     expense_tree.append(cat)
@@ -800,9 +941,17 @@ def summary(
             click.echo("Income")
             click.echo("*" * 80)
             for cat in income_tree:
-                total = _calculate_category_total(db, cat["id"], filtered_transactions)
+                total = _calculate_category_total(
+                    descendant_map, cat["id"], filtered_transactions
+                )
                 income_subtotal += total
-            _display_expanded_summary(db, income_tree, filtered_transactions, indent=1, is_first=True)
+            _display_expanded_summary(
+                descendant_map,
+                income_tree,
+                filtered_transactions,
+                indent=1,
+                is_first=True,
+            )
             if income_subtotal != 0:
                 click.echo("-" * 80)
                 income_subtotal_str = f"${income_subtotal:,.2f}"
@@ -815,9 +964,17 @@ def summary(
             click.echo("Transfer")
             click.echo("*" * 80)
             for cat in transfer_tree:
-                total = _calculate_category_total(db, cat["id"], filtered_transactions)
+                total = _calculate_category_total(
+                    descendant_map, cat["id"], filtered_transactions
+                )
                 transfer_subtotal += total
-            _display_expanded_summary(db, transfer_tree, filtered_transactions, indent=1, is_first=True)
+            _display_expanded_summary(
+                descendant_map,
+                transfer_tree,
+                filtered_transactions,
+                indent=1,
+                is_first=True,
+            )
             if transfer_subtotal != 0:
                 click.echo("-" * 80)
                 transfer_subtotal_str = f"${transfer_subtotal:,.2f}"
@@ -831,13 +988,23 @@ def summary(
             click.echo("*" * 80)
         if expense_tree:
             for cat in expense_tree:
-                total = _calculate_category_total(db, cat["id"], filtered_transactions)
+                total = _calculate_category_total(
+                    descendant_map, cat["id"], filtered_transactions
+                )
                 expense_subtotal += total
-            _display_expanded_summary(db, expense_tree, filtered_transactions, indent=1, is_first=True)
+            _display_expanded_summary(
+                descendant_map,
+                expense_tree,
+                filtered_transactions,
+                indent=1,
+                is_first=True,
+            )
 
         # Display uncategorized if present (treated as Expense)
         if has_uncategorized:
-            uncategorized_total = _calculate_category_total(db, None, filtered_transactions)
+            uncategorized_total = _calculate_category_total(
+                descendant_map, None, filtered_transactions
+            )
             expense_subtotal += uncategorized_total
             if uncategorized_total != 0:
                 total_str = f"${uncategorized_total:,.2f}"
@@ -852,7 +1019,10 @@ def summary(
     else:
         # Standard view: show top-level categories (or subcategories if category filter is specified)
         summaries = service.get_summary(
-            start_date=start, end_date=end, category_path=category, include_transfers=include_transfers
+            start_date=start,
+            end_date=end,
+            category_path=category,
+            include_transfers=include_transfers,
         )
 
         if not summaries:
@@ -880,15 +1050,23 @@ def summary(
             cat_type = s.get("category_type")
             if cat_type == 1:  # Income
                 income_summaries.append(s)
-            elif cat_type == 2 and include_transfers:  # Transfer (only if including transfers)
+            elif (
+                cat_type == 2 and include_transfers
+            ):  # Transfer (only if including transfers)
                 transfer_summaries.append(s)
             else:  # Expense (0) or Uncategorized (None)
                 expense_summaries.append(s)
 
         # Sort each group by absolute value (descending), then by name for ties
-        income_summaries.sort(key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or ""))
-        transfer_summaries.sort(key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or ""))
-        expense_summaries.sort(key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or ""))
+        income_summaries.sort(
+            key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or "")
+        )
+        transfer_summaries.sort(
+            key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or "")
+        )
+        expense_summaries.sort(
+            key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or "")
+        )
 
         # Display Income categories first
         if income_summaries:
@@ -959,4 +1137,3 @@ def summary(
 def register_commands(cli):
     """Register summary command with main CLI."""
     cli.add_command(summary)
-

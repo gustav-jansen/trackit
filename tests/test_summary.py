@@ -8,15 +8,15 @@ from trackit.cli.main import cli
 
 def test_summary_empty(cli_runner, temp_db):
     """Test summary when no transactions exist."""
-    result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "summary"]
-    )
+    result = cli_runner.invoke(cli, ["--db-path", temp_db.database_path, "summary"])
 
     assert result.exit_code == 0
     assert "No transactions found" in result.output
 
 
-def test_summary_basic(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_basic(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test basic summary groups by top-level category."""
     from datetime import date
     from decimal import Decimal
@@ -52,9 +52,7 @@ def test_summary_basic(cli_runner, temp_db, sample_account, sample_categories, t
         category_id=sample_categories["Transportation > Gas"],
     )
 
-    result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "summary"]
-    )
+    result = cli_runner.invoke(cli, ["--db-path", temp_db.database_path, "summary"])
 
     assert result.exit_code == 0
     assert "Category Summary" in result.output
@@ -72,10 +70,17 @@ def test_summary_basic(cli_runner, temp_db, sample_account, sample_categories, t
     # Should show overall total (-75.50 + -30.00 = -105.50)
     assert "-105.50" in result.output or "-105.5" in result.output
     # Should show month column header (columnar format)
-    assert any(month in result.output for month in ["2025-12", "2025-11", "2025-10", "2025-09", "2025-08", "2025-07"])
+    from dateutil.relativedelta import relativedelta
+
+    expected_months = [
+        (today - relativedelta(months=offset)).strftime("%Y-%m") for offset in range(6)
+    ]
+    assert any(month in result.output for month in expected_months)
 
 
-def test_summary_with_date_filter(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_with_date_filter(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test summary with date filters."""
     from datetime import date
     from decimal import Decimal
@@ -106,7 +111,9 @@ def test_summary_with_date_filter(cli_runner, temp_db, sample_account, sample_ca
     assert "Category Summary" in result.output
 
 
-def test_summary_with_category_filter(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_with_category_filter(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test summary with category filter groups by subcategories."""
     from datetime import date
     from decimal import Decimal
@@ -155,7 +162,9 @@ def test_summary_with_category_filter(cli_runner, temp_db, sample_account, sampl
     assert "-25.50" in result.output or "-25.5" in result.output
 
 
-def test_summary_with_subcategory_filter(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_with_subcategory_filter(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test summary when filtering by a specific subcategory."""
     from datetime import date
     from decimal import Decimal
@@ -191,7 +200,14 @@ def test_summary_with_subcategory_filter(cli_runner, temp_db, sample_account, sa
     assert "-50.00" in result.output
 
 
-def test_summary_excludes_transfers_by_default(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+def test_summary_excludes_transfers_by_default(
+    cli_runner,
+    temp_db,
+    sample_account,
+    sample_categories,
+    transaction_service,
+    category_service,
+):
     """Test that Transfer type category transactions are excluded by default."""
     from datetime import date
     from decimal import Decimal
@@ -199,8 +215,12 @@ def test_summary_excludes_transfers_by_default(cli_runner, temp_db, sample_accou
     # Use recent dates within the default 6-month range
     today = date.today()
     # Create Transfer type category and subcategory (type 2 = Transfer)
-    transfer_id = category_service.create_category(name="Transfer", parent_path=None, category_type=2)
-    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer", category_type=2)
+    transfer_id = category_service.create_category(
+        name="Transfer", parent_path=None, category_type=2
+    )
+    transfer_sub_id = category_service.create_category(
+        name="Between Accounts", parent_path="Transfer", category_type=2
+    )
 
     # Add a regular transaction
     transaction_service.create_transaction(
@@ -222,9 +242,7 @@ def test_summary_excludes_transfers_by_default(cli_runner, temp_db, sample_accou
         category_id=transfer_sub_id,
     )
 
-    result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "summary"]
-    )
+    result = cli_runner.invoke(cli, ["--db-path", temp_db.database_path, "summary"])
 
     assert result.exit_code == 0
     assert "Category Summary" in result.output
@@ -237,7 +255,14 @@ def test_summary_excludes_transfers_by_default(cli_runner, temp_db, sample_accou
     assert "-100.00" not in result.output
 
 
-def test_summary_includes_transfers_with_flag(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+def test_summary_includes_transfers_with_flag(
+    cli_runner,
+    temp_db,
+    sample_account,
+    sample_categories,
+    transaction_service,
+    category_service,
+):
     """Test that Transfer type category transactions are included with --include-transfers flag."""
     from datetime import date
     from decimal import Decimal
@@ -245,8 +270,12 @@ def test_summary_includes_transfers_with_flag(cli_runner, temp_db, sample_accoun
     # Use recent dates within the default 6-month range
     today = date.today()
     # Create Transfer type category and subcategory (type 2 = Transfer)
-    transfer_id = category_service.create_category(name="Transfer", parent_path=None, category_type=2)
-    transfer_sub_id = category_service.create_category(name="Between Accounts", parent_path="Transfer", category_type=2)
+    transfer_id = category_service.create_category(
+        name="Transfer", parent_path=None, category_type=2
+    )
+    transfer_sub_id = category_service.create_category(
+        name="Between Accounts", parent_path="Transfer", category_type=2
+    )
 
     # Add a regular transaction
     transaction_service.create_transaction(
@@ -283,7 +312,14 @@ def test_summary_includes_transfers_with_flag(cli_runner, temp_db, sample_accoun
     assert "-100.00" in result.output
 
 
-def test_summary_excludes_transfers_with_subcategories(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+def test_summary_excludes_transfers_with_subcategories(
+    cli_runner,
+    temp_db,
+    sample_account,
+    sample_categories,
+    transaction_service,
+    category_service,
+):
     """Test that Transfer type category and all its subcategories are excluded by default."""
     from datetime import date
     from decimal import Decimal
@@ -291,9 +327,15 @@ def test_summary_excludes_transfers_with_subcategories(cli_runner, temp_db, samp
     # Use recent dates within the default 6-month range
     today = date.today()
     # Create Transfer type category with multiple subcategories (type 2 = Transfer)
-    transfer_id = category_service.create_category(name="Transfer", parent_path=None, category_type=2)
-    transfer_sub1_id = category_service.create_category(name="Between Accounts", parent_path="Transfer", category_type=2)
-    transfer_sub2_id = category_service.create_category(name="To Investment", parent_path="Transfer", category_type=2)
+    transfer_id = category_service.create_category(
+        name="Transfer", parent_path=None, category_type=2
+    )
+    transfer_sub1_id = category_service.create_category(
+        name="Between Accounts", parent_path="Transfer", category_type=2
+    )
+    transfer_sub2_id = category_service.create_category(
+        name="To Investment", parent_path="Transfer", category_type=2
+    )
 
     # Add regular transactions
     transaction_service.create_transaction(
@@ -324,9 +366,7 @@ def test_summary_excludes_transfers_with_subcategories(cli_runner, temp_db, samp
         category_id=transfer_sub2_id,
     )
 
-    result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "summary"]
-    )
+    result = cli_runner.invoke(cli, ["--db-path", temp_db.database_path, "summary"])
 
     assert result.exit_code == 0
     assert "Category Summary" in result.output
@@ -342,7 +382,9 @@ def test_summary_excludes_transfers_with_subcategories(cli_runner, temp_db, samp
     assert "-200.00" not in result.output
 
 
-def test_summary_expand_flag(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_expand_flag(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test that --expand flag shows full category tree with indentation."""
     from datetime import date
     from decimal import Decimal
@@ -401,7 +443,9 @@ def test_summary_expand_flag(cli_runner, temp_db, sample_account, sample_categor
     assert "-105.50" in result.output or "-105.5" in result.output
 
 
-def test_summary_expand_with_category_filter(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_expand_with_category_filter(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test that --expand with --category shows only that category's subtree."""
     from datetime import date
     from decimal import Decimal
@@ -459,7 +503,9 @@ def test_summary_expand_with_category_filter(cli_runner, temp_db, sample_account
     assert "Gas" not in result.output
 
 
-def test_summary_expand_indentation(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_expand_indentation(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test that expanded view properly indents child categories."""
     from datetime import date
     from decimal import Decimal
@@ -501,7 +547,14 @@ def test_summary_expand_indentation(cli_runner, temp_db, sample_account, sample_
     assert food_line.startswith("    ")
 
 
-def test_summary_groups_by_type_with_subtotals(cli_runner, temp_db, sample_account, sample_categories, transaction_service, category_service):
+def test_summary_groups_by_type_with_subtotals(
+    cli_runner,
+    temp_db,
+    sample_account,
+    sample_categories,
+    transaction_service,
+    category_service,
+):
     """Test that summary groups categories by type (Income first, then Expense) with subtotals."""
     from datetime import date
     from decimal import Decimal
@@ -509,7 +562,9 @@ def test_summary_groups_by_type_with_subtotals(cli_runner, temp_db, sample_accou
     # Use recent dates within the default 6-month range
     today = date.today()
     # Create an Income type category
-    income_cat_id = category_service.create_category(name="Salary", parent_path=None, category_type=1)
+    income_cat_id = category_service.create_category(
+        name="Salary", parent_path=None, category_type=1
+    )
 
     # Add income transaction
     transaction_service.create_transaction(
@@ -531,15 +586,13 @@ def test_summary_groups_by_type_with_subtotals(cli_runner, temp_db, sample_accou
         category_id=sample_categories["Food & Dining > Groceries"],
     )
 
-    result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "summary"]
-    )
+    result = cli_runner.invoke(cli, ["--db-path", temp_db.database_path, "summary"])
 
     assert result.exit_code == 0
     assert "Category Summary" in result.output
 
     # Check that Income section comes first
-    output_lines = result.output.split('\n')
+    output_lines = result.output.split("\n")
     income_index = None
     expense_index = None
     income_subtotal_index = None
@@ -576,7 +629,9 @@ def test_summary_groups_by_type_with_subtotals(cli_runner, temp_db, sample_accou
     assert "-50.00" in result.output
 
 
-def test_summary_this_month(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_this_month(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test summary with --this-month option."""
     from datetime import date, timedelta
     from decimal import Decimal
@@ -614,7 +669,9 @@ def test_summary_this_month(cli_runner, temp_db, sample_account, sample_categori
     assert "-25.00" not in result.output
 
 
-def test_summary_this_year(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_this_year(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test summary with --this-year option."""
     from datetime import date
     from decimal import Decimal
@@ -651,7 +708,9 @@ def test_summary_this_year(cli_runner, temp_db, sample_account, sample_categorie
     assert "-25.00" not in result.output
 
 
-def test_summary_last_month(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_last_month(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test summary with --last-month option."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -692,7 +751,9 @@ def test_summary_last_month(cli_runner, temp_db, sample_account, sample_categori
     assert "-25.00" not in result.output
 
 
-def test_summary_last_year(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_last_year(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test summary with --last-year option."""
     from datetime import date
     from decimal import Decimal
@@ -782,7 +843,9 @@ def test_summary_period_options_validation_with_end_date(cli_runner, temp_db):
     assert "cannot be combined" in result.output
 
 
-def test_summary_period_options_with_category(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_period_options_with_category(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test that period options work with --category filter."""
     from datetime import date
     from decimal import Decimal
@@ -825,7 +888,9 @@ def test_summary_period_options_with_category(cli_runner, temp_db, sample_accoun
     assert "Transportation" not in result.output
 
 
-def test_summary_group_by_month_basic(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_month_basic(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test basic month grouping."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -844,7 +909,7 @@ def test_summary_group_by_month_basic(cli_runner, temp_db, sample_account, sampl
     )
 
     # Add transaction in previous month
-    last_month = (today - relativedelta(months=1))
+    last_month = today - relativedelta(months=1)
     transaction_service.create_transaction(
         unique_id="TXN002",
         account_id=sample_account.id,
@@ -868,7 +933,9 @@ def test_summary_group_by_month_basic(cli_runner, temp_db, sample_account, sampl
     assert "-30.00" in result.output
 
 
-def test_summary_group_by_year_basic(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_year_basic(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test basic year grouping."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -924,7 +991,9 @@ def test_summary_group_by_year_basic(cli_runner, temp_db, sample_account, sample
     assert "-30.00" in result.output
 
 
-def test_summary_group_by_month_with_date_filter(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_month_with_date_filter(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test month grouping with date range filter."""
     from datetime import date
     from decimal import Decimal
@@ -981,7 +1050,9 @@ def test_summary_group_by_month_with_date_filter(cli_runner, temp_db, sample_acc
     assert "-25.00" not in result.output  # Should be excluded
 
 
-def test_summary_group_by_year_with_date_filter(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_year_with_date_filter(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test year grouping with date range filter."""
     from datetime import date
     from decimal import Decimal
@@ -1038,7 +1109,9 @@ def test_summary_group_by_year_with_date_filter(cli_runner, temp_db, sample_acco
     assert "-25.00" not in result.output  # Should be excluded
 
 
-def test_summary_group_by_month_expanded(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_month_expanded(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test month grouping with --expand flag."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -1046,7 +1119,7 @@ def test_summary_group_by_month_expanded(cli_runner, temp_db, sample_account, sa
 
     # Use recent dates within the default 6-month range
     today = date.today()
-    last_month = (today - relativedelta(months=1))
+    last_month = today - relativedelta(months=1)
     transaction_service.create_transaction(
         unique_id="TXN001",
         account_id=sample_account.id,
@@ -1066,7 +1139,8 @@ def test_summary_group_by_month_expanded(cli_runner, temp_db, sample_account, sa
     )
 
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "summary", "--group-by-month", "--expand"]
+        cli,
+        ["--db-path", temp_db.database_path, "summary", "--group-by-month", "--expand"],
     )
 
     assert result.exit_code == 0
@@ -1080,7 +1154,9 @@ def test_summary_group_by_month_expanded(cli_runner, temp_db, sample_account, sa
     assert "Coffee" in result.output or "Coffee & Snacks" in result.output
 
 
-def test_summary_group_by_year_expanded(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_year_expanded(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test year grouping with --expand flag."""
     from datetime import date
     from decimal import Decimal
@@ -1153,7 +1229,9 @@ def test_summary_group_by_month_year_mutually_exclusive(cli_runner, temp_db):
     assert "cannot be specified at the same time" in result.output
 
 
-def test_summary_group_by_month_all_transactions(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_month_all_transactions(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test month grouping with no date filter (uses default: last 6 months)."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -1171,7 +1249,7 @@ def test_summary_group_by_month_all_transactions(cli_runner, temp_db, sample_acc
         category_id=sample_categories["Food & Dining > Groceries"],
     )
 
-    last_month = (today - relativedelta(months=1))
+    last_month = today - relativedelta(months=1)
     transaction_service.create_transaction(
         unique_id="TXN002",
         account_id=sample_account.id,
@@ -1193,7 +1271,9 @@ def test_summary_group_by_month_all_transactions(cli_runner, temp_db, sample_acc
     assert current_month in result.output or last_month_str in result.output
 
 
-def test_summary_group_by_month_multiple_periods(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_month_multiple_periods(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test month grouping with multiple months and different categories."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -1201,7 +1281,7 @@ def test_summary_group_by_month_multiple_periods(cli_runner, temp_db, sample_acc
 
     # Use recent dates within the default 6-month range
     today = date.today()
-    last_month = (today - relativedelta(months=1))
+    last_month = today - relativedelta(months=1)
     # Add transactions in different months and categories
     transaction_service.create_transaction(
         unique_id="TXN001",
@@ -1248,7 +1328,9 @@ def test_summary_group_by_month_multiple_periods(cli_runner, temp_db, sample_acc
     assert "-25.00" in result.output or "-25.0" in result.output
 
 
-def test_summary_group_by_month_with_category_filter(cli_runner, temp_db, sample_account, sample_categories, transaction_service):
+def test_summary_group_by_month_with_category_filter(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
     """Test month grouping with category filter."""
     from datetime import date
     from dateutil.relativedelta import relativedelta
@@ -1256,7 +1338,7 @@ def test_summary_group_by_month_with_category_filter(cli_runner, temp_db, sample
 
     # Use recent dates within the default 6-month range
     today = date.today()
-    last_month = (today - relativedelta(months=1))
+    last_month = today - relativedelta(months=1)
     # Add transactions in different months and categories
     transaction_service.create_transaction(
         unique_id="TXN001",
@@ -1308,4 +1390,3 @@ def test_summary_group_by_month_with_category_filter(cli_runner, temp_db, sample
     assert "Transportation" not in result.output
     assert "-50.00" in result.output or "-50.0" in result.output
     assert "-25.00" in result.output or "-25.0" in result.output
-
