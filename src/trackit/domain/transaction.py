@@ -86,7 +86,9 @@ class TransactionService:
         """
         return self.db.get_transaction(transaction_id)
 
-    def update_category(self, transaction_id: int, category_path: Optional[str]) -> None:
+    def update_category(
+        self, transaction_id: int, category_path: Optional[str]
+    ) -> None:
         """Update transaction category.
 
         Args:
@@ -251,6 +253,37 @@ class TransactionService:
             uncategorized=uncategorized,
         )
 
+    def get_summary_transactions(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category_path: Optional[str] = None,
+        include_transfers: bool = False,
+    ) -> list[TransactionEntity]:
+        """Get transactions for summary views.
+
+        Args:
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            category_path: Optional category path filter
+            include_transfers: If True, include transactions with Transfer category
+
+        Returns:
+            List of transaction entities
+        """
+        category_id = None
+        if category_path is not None:
+            category = self.db.get_category_by_path(category_path)
+            if category is not None:
+                category_id = category.id
+
+        return self.db.get_summary_transactions(
+            start_date=start_date,
+            end_date=end_date,
+            category_id=category_id,
+            include_transfers=include_transfers,
+        )
+
     def get_summary(
         self,
         start_date: Optional[date] = None,
@@ -276,6 +309,8 @@ class TransactionService:
                 category_id = category.id
 
         return self.db.get_category_summary(
-            start_date=start_date, end_date=end_date, category_id=category_id, include_transfers=include_transfers
+            start_date=start_date,
+            end_date=end_date,
+            category_id=category_id,
+            include_transfers=include_transfers,
         )
-
