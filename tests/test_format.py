@@ -71,6 +71,24 @@ def test_format_list_empty(cli_runner, temp_db):
     assert "No CSV formats found" in result.output
 
 
+def test_format_list_invalid_account(cli_runner, temp_db):
+    """Test listing formats with invalid account filter."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "list",
+            "--account",
+            "999",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+
+
 def test_format_list_with_data(cli_runner, temp_db, sample_csv_format):
     """Test listing formats with data."""
     result = cli_runner.invoke(
@@ -146,7 +164,9 @@ def test_format_create_with_account_name(cli_runner, temp_db, sample_account):
     assert "Created CSV format 'Test Format 2'" in result.output
 
 
-def test_format_list_with_account_name(cli_runner, temp_db, sample_account, sample_csv_format):
+def test_format_list_with_account_name(
+    cli_runner, temp_db, sample_account, sample_csv_format
+):
     """Test listing formats filtered by account name."""
     result = cli_runner.invoke(
         cli,
@@ -223,6 +243,25 @@ def test_format_update_account(cli_runner, temp_db, sample_account, sample_csv_f
     assert result.exit_code == 0
     assert "Updated format 'Test Format'" in result.output
     assert "Reassigned to account: 'Account 2'" in result.output
+
+
+def test_format_update_invalid_account(cli_runner, temp_db, sample_csv_format):
+    """Test updating format with invalid account fails."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "format",
+            "update",
+            "Test Format",
+            "--account",
+            "999",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
 
 
 def test_format_update_both(cli_runner, temp_db, sample_account, sample_csv_format):
@@ -355,7 +394,9 @@ def test_format_delete(cli_runner, temp_db, sample_account, sample_csv_format):
     assert "Test Format" not in list_result.output
 
 
-def test_format_delete_without_confirmation(cli_runner, temp_db, sample_account, sample_csv_format):
+def test_format_delete_without_confirmation(
+    cli_runner, temp_db, sample_account, sample_csv_format
+):
     """Test that deletion is cancelled without confirmation."""
     result = cli_runner.invoke(
         cli,
@@ -510,7 +551,9 @@ def test_format_map_debit_credit(cli_runner, temp_db, sample_account):
     assert result.exit_code == 0
 
 
-def test_format_map_amount_to_debit_credit_format_fails(cli_runner, temp_db, sample_account):
+def test_format_map_amount_to_debit_credit_format_fails(
+    cli_runner, temp_db, sample_account
+):
     """Test that mapping amount to debit/credit format fails."""
     # Create debit/credit format
     result = cli_runner.invoke(
@@ -579,7 +622,9 @@ def test_format_map_debit_to_regular_format_fails(cli_runner, temp_db, sample_ac
     assert "Cannot map 'debit' field for non-debit/credit format" in result.output
 
 
-def test_format_validate_debit_credit_missing_columns(cli_runner, temp_db, sample_account):
+def test_format_validate_debit_credit_missing_columns(
+    cli_runner, temp_db, sample_account
+):
     """Test validation of debit/credit format with missing columns."""
     # Create debit/credit format
     result = cli_runner.invoke(
@@ -664,4 +709,3 @@ def test_format_update_debit_credit_flags(cli_runner, temp_db, sample_account):
     assert "Debit/Credit format: enabled" in result.output
     assert "Negate debit: enabled" in result.output
     assert "Negate credit: enabled" in result.output
-

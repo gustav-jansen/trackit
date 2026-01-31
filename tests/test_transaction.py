@@ -132,6 +132,24 @@ def test_view_transactions_empty(cli_runner, temp_db):
     assert "No transactions found" in result.output
 
 
+def test_view_transactions_invalid_account(cli_runner, temp_db):
+    """Test viewing transactions with invalid account filter."""
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "list",
+            "--account",
+            "999",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+
+
 def test_view_transactions(cli_runner, temp_db, sample_account, transaction_service):
     """Test viewing transactions."""
     # Add a transaction
@@ -923,6 +941,38 @@ def test_transaction_update_not_found(cli_runner, temp_db):
             "99999",
             "--amount",
             "-75.00",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+
+
+def test_transaction_update_invalid_account(
+    cli_runner, temp_db, sample_account, transaction_service
+):
+    """Test updating transaction with invalid account fails."""
+    from datetime import date
+    from decimal import Decimal
+
+    txn_id = transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-50.00"),
+        description="Original Description",
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "transaction",
+            "update",
+            str(txn_id),
+            "--account",
+            "999",
         ],
     )
 

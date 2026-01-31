@@ -11,7 +11,16 @@ def test_account_create_with_bank(cli_runner, temp_db, monkeypatch):
     monkeypatch.setenv("TRACKIT_DB_PATH", temp_db.database_path)
 
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "create", "Test Account", "--bank", "Test Bank"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "create",
+            "Test Account",
+            "--bank",
+            "Test Bank",
+        ],
     )
 
     assert result.exit_code == 0
@@ -55,13 +64,31 @@ def test_account_create_duplicate(cli_runner, temp_db):
     """Test creating duplicate account name fails."""
     # Create first account
     result1 = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "create", "Test Account", "--bank", "Bank1"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "create",
+            "Test Account",
+            "--bank",
+            "Bank1",
+        ],
     )
     assert result1.exit_code == 0
 
     # Try to create duplicate
     result2 = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "create", "Test Account", "--bank", "Bank2"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "create",
+            "Test Account",
+            "--bank",
+            "Bank2",
+        ],
     )
 
     assert result2.exit_code == 1
@@ -93,7 +120,15 @@ def test_account_name_resolution(cli_runner, temp_db, sample_account):
 def test_account_rename_name_only(cli_runner, temp_db, sample_account):
     """Test renaming account name only."""
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "rename", "Test Account", "New Account Name"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "rename",
+            "Test Account",
+            "New Account Name",
+        ],
     )
 
     assert result.exit_code == 0
@@ -132,18 +167,44 @@ def test_account_rename_duplicate_name(cli_runner, temp_db):
     """Test renaming to duplicate name fails."""
     # Create two accounts
     result1 = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "create", "Account 1", "--bank", "Bank1"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "create",
+            "Account 1",
+            "--bank",
+            "Bank1",
+        ],
     )
     assert result1.exit_code == 0
 
     result2 = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "create", "Account 2", "--bank", "Bank2"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "create",
+            "Account 2",
+            "--bank",
+            "Bank2",
+        ],
     )
     assert result2.exit_code == 0
 
     # Try to rename Account 2 to Account 1
     result3 = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "rename", "Account 2", "Account 1"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "rename",
+            "Account 2",
+            "Account 1",
+        ],
     )
 
     assert result3.exit_code == 1
@@ -153,7 +214,26 @@ def test_account_rename_duplicate_name(cli_runner, temp_db):
 def test_account_rename_not_found(cli_runner, temp_db):
     """Test renaming non-existent account fails."""
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "rename", "NonExistent", "New Name"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "rename",
+            "NonExistent",
+            "New Name",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+
+
+def test_account_rename_invalid_id(cli_runner, temp_db):
+    """Test renaming with an invalid account ID fails."""
+    result = cli_runner.invoke(
+        cli,
+        ["--db-path", temp_db.database_path, "account", "rename", "999", "New Name"],
     )
 
     assert result.exit_code == 1
@@ -163,7 +243,15 @@ def test_account_rename_not_found(cli_runner, temp_db):
 def test_account_rename_by_id(cli_runner, temp_db, sample_account):
     """Test renaming account using account ID."""
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "rename", "1", "Renamed Account"]
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "account",
+            "rename",
+            "1",
+            "Renamed Account",
+        ],
     )
 
     assert result.exit_code == 0
@@ -173,7 +261,9 @@ def test_account_rename_by_id(cli_runner, temp_db, sample_account):
 def test_account_delete_with_confirmation(cli_runner, temp_db, sample_account):
     """Test deleting account with confirmation."""
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "delete", "Test Account"], input="y\n"
+        cli,
+        ["--db-path", temp_db.database_path, "account", "delete", "Test Account"],
+        input="y\n",
     )
 
     assert result.exit_code == 0
@@ -189,7 +279,9 @@ def test_account_delete_with_confirmation(cli_runner, temp_db, sample_account):
 def test_account_delete_without_confirmation(cli_runner, temp_db, sample_account):
     """Test that deletion is cancelled without confirmation."""
     result = cli_runner.invoke(
-        cli, ["--db-path", temp_db.database_path, "account", "delete", "Test Account"], input="n\n"
+        cli,
+        ["--db-path", temp_db.database_path, "account", "delete", "Test Account"],
+        input="n\n",
     )
 
     assert result.exit_code == 0
@@ -200,6 +292,16 @@ def test_account_delete_without_confirmation(cli_runner, temp_db, sample_account
         cli, ["--db-path", temp_db.database_path, "account", "list"]
     )
     assert "Test Account" in list_result.output
+
+
+def test_account_delete_invalid_id(cli_runner, temp_db):
+    """Test deleting with an invalid account ID fails."""
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "account", "delete", "999"]
+    )
+
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
 
 
 def test_account_delete_with_transactions(cli_runner, temp_db, sample_account):
@@ -321,4 +423,3 @@ def test_account_delete_by_id(cli_runner, temp_db, sample_account):
 
     assert result.exit_code == 0
     assert "Deleted account" in result.output
-
