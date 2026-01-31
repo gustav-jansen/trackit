@@ -1,13 +1,10 @@
 """Summary commands."""
 
 import click
+from trackit.cli.date_filters import resolve_cli_date_range
 from trackit.domain.transaction import TransactionService
 from trackit.domain.category import CategoryService
-from trackit.utils.date_parser import (
-    parse_date,
-    get_date_range,
-    get_last_six_months_range,
-)
+from trackit.utils.date_parser import get_last_six_months_range
 
 
 def _build_descendant_map(category_tree):
@@ -746,31 +743,6 @@ def summary(
     db = ctx.obj["db"]
     service = TransactionService(db)
 
-    # Validate period options
-    period_options = [
-        this_month,
-        this_year,
-        this_week,
-        last_month,
-        last_year,
-        last_week,
-    ]
-    period_count = sum(period_options)
-
-    if period_count > 1:
-        click.echo(
-            "Error: Only one period option (--this-month, --this-year, --this-week, --last-month, --last-year, --last-week) can be specified at a time.",
-            err=True,
-        )
-        ctx.exit(1)
-
-    if period_count > 0 and (start_date or end_date):
-        click.echo(
-            "Error: Period options (--this-month, --this-year, etc.) cannot be combined with --start-date or --end-date.",
-            err=True,
-        )
-        ctx.exit(1)
-
     # Validate grouping options
     if group_by_month and group_by_year:
         click.echo(
@@ -783,43 +755,21 @@ def summary(
     if not group_by_month and not group_by_year:
         group_by_month = True
 
-    # Parse dates
-    start = None
-    end = None
-
-    if period_count == 1:
-        # Determine which period option was set
-        if this_month:
-            start, end = get_date_range("this-month")
-        elif this_year:
-            start, end = get_date_range("this-year")
-        elif this_week:
-            start, end = get_date_range("this-week")
-        elif last_month:
-            start, end = get_date_range("last-month")
-        elif last_year:
-            start, end = get_date_range("last-year")
-        elif last_week:
-            start, end = get_date_range("last-week")
-    else:
-        # Use explicit start/end dates if provided
-        if start_date:
-            try:
-                start = parse_date(start_date)
-            except ValueError as e:
-                click.echo(f"Error: Invalid start date: {e}", err=True)
-                ctx.exit(1)
-
-        if end_date:
-            try:
-                end = parse_date(end_date)
-            except ValueError as e:
-                click.echo(f"Error: Invalid end date: {e}", err=True)
-                ctx.exit(1)
-
-        # If no date filters specified, use default: last 6 months including current month
-        if start is None and end is None:
-            start, end = get_last_six_months_range()
+    period_flags = {
+        "this-month": this_month,
+        "this-year": this_year,
+        "this-week": this_week,
+        "last-month": last_month,
+        "last-year": last_year,
+        "last-week": last_week,
+    }
+    start, end = resolve_cli_date_range(
+        ctx,
+        start_date=start_date,
+        end_date=end_date,
+        period_flags=period_flags,
+        default_range=get_last_six_months_range(),
+    )
 
     # Get filtered transactions for overall total calculation
     filtered_transactions = _get_filtered_transactions(
