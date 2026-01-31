@@ -24,33 +24,9 @@ def _build_descendant_map(category_tree):
     return descendant_map
 
 
-def _build_category_tree(db, category_service, category_path):
+def _build_category_tree(category_service, category_path):
     """Build category tree, filtered by category path if provided."""
-    if category_path:
-        category_obj = db.get_category_by_path(category_path)
-        if category_obj:
-
-            def build_subtree(cat_id):
-                cat = db.get_category(cat_id)
-                if cat is None:
-                    return None
-                children = category_service.list_categories(parent_id=cat_id)
-                child_trees = [build_subtree(child.id) for child in children]
-                child_trees = [ct for ct in child_trees if ct is not None]
-                return {
-                    "id": cat.id,
-                    "name": cat.name,
-                    "parent_id": cat.parent_id,
-                    "category_type": cat.category_type,
-                    "created_at": cat.created_at,
-                    "children": child_trees,
-                }
-
-            subtree = build_subtree(category_obj.id)
-            return [subtree] if subtree else []
-        return []
-
-    return category_service.get_category_tree()
+    return category_service.get_category_subtree_by_path(category_path)
 
 
 def _calculate_category_total(descendant_map, category_id, transactions):
@@ -797,7 +773,7 @@ def summary(
         if expand:
             # Expanded columnar view
             category_service = CategoryService(db)
-            category_tree = _build_category_tree(db, category_service, category)
+            category_tree = _build_category_tree(category_service, category)
             descendant_map = _build_descendant_map(category_tree)
 
             has_uncategorized = any(
@@ -829,7 +805,7 @@ def summary(
 
             click.echo("\nCategory Summary:")
             category_service = CategoryService(db)
-            category_tree = _build_category_tree(db, category_service, category)
+            category_tree = _build_category_tree(category_service, category)
             descendant_map = _build_descendant_map(category_tree)
             _display_columnar_summary_standard(
                 db,
@@ -847,7 +823,7 @@ def summary(
     if expand:
         # Expanded view: show full category tree
         category_service = CategoryService(db)
-        category_tree = _build_category_tree(db, category_service, category)
+        category_tree = _build_category_tree(category_service, category)
         descendant_map = _build_descendant_map(category_tree)
 
         # Also include uncategorized if there are any
