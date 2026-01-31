@@ -215,9 +215,7 @@ def test_summary_excludes_transfers_by_default(
     # Use recent dates within the default 6-month range
     today = date.today()
     # Create Transfer type category and subcategory (type 2 = Transfer)
-    transfer_id = category_service.create_category(
-        name="Transfer", parent_path=None, category_type=2
-    )
+    category_service.create_category(name="Transfer", parent_path=None, category_type=2)
     transfer_sub_id = category_service.create_category(
         name="Between Accounts", parent_path="Transfer", category_type=2
     )
@@ -501,6 +499,329 @@ def test_summary_expand_with_category_filter(
     # Should NOT show Transportation
     assert "Transportation" not in result.output
     assert "Gas" not in result.output
+
+
+def test_summary_expand_category_filter_orders_children(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
+    """Test child ordering within a filtered category subtree."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.50"),
+        description="Coffee",
+        category_id=sample_categories["Food & Dining > Coffee & Snacks"],
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--expand",
+            "--category",
+            "Food & Dining",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+    lines = result.output.split("\n")
+    coffee_index = None
+    groceries_index = None
+    for i, line in enumerate(lines):
+        if "Coffee" in line and coffee_index is None:
+            coffee_index = i
+        if "Groceries" in line and groceries_index is None:
+            groceries_index = i
+
+    assert coffee_index is not None
+    assert groceries_index is not None
+    assert groceries_index < coffee_index
+
+
+def test_summary_category_filter_nonexistent_path_shows_default_summary(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
+    """Test that a non-existent category path does not filter results."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--category",
+            "Not A Category",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "Food & Dining" not in result.output
+    assert "Groceries" not in result.output
+
+
+def test_summary_expand_with_leaf_category_filter_shows_leaf_only(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
+    """Test that --expand with a leaf category shows only that leaf."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--expand",
+            "--category",
+            "Food & Dining > Groceries",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary (Expanded)" in result.output
+    assert "Groceries" in result.output
+    assert "Food & Dining" not in result.output
+    assert "Coffee & Snacks" not in result.output
+
+
+def test_summary_category_filter_trims_spaces(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
+    """Test that category path trimming matches categories."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--category",
+            "  Food & Dining  >   Groceries ",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "Groceries" in result.output
+
+
+def test_summary_category_filter_case_sensitive(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
+    """Test that category path matching is case-sensitive."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--category",
+            "food & dining > groceries",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "Food & Dining" not in result.output
+    assert "Groceries" not in result.output
+
+
+def test_summary_category_filter_transfer_requires_include_transfers(
+    cli_runner,
+    temp_db,
+    sample_account,
+    sample_categories,
+    transaction_service,
+    category_service,
+):
+    """Test that transfer filters require --include-transfers to show results."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transfer_id = category_service.create_category(
+        name="Transfer", parent_path=None, category_type=2
+    )
+    transfer_sub_id = category_service.create_category(
+        name="Between Accounts", parent_path="Transfer", category_type=2
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-100.00"),
+        description="Transfer to savings",
+        category_id=transfer_sub_id,
+    )
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--category",
+            "Transfer",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "No transactions found" in result.output
+
+    result = cli_runner.invoke(
+        cli,
+        [
+            "--db-path",
+            temp_db.database_path,
+            "summary",
+            "--category",
+            "Transfer",
+            "--include-transfers",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "Transfer" in result.output
+    assert "Between Accounts" in result.output
+    assert "-100.00" in result.output
+
+
+def test_summary_expand_root_ordering_by_total(
+    cli_runner, temp_db, sample_account, sample_categories, transaction_service
+):
+    """Test expanded ordering of top-level categories by total value."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-100.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-30.00"),
+        description="Gas",
+        category_id=sample_categories["Transportation > Gas"],
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN003",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-10.00"),
+        description="Electricity",
+        category_id=sample_categories["Bills & Utilities > Electricity"],
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary", "--expand"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary (Expanded)" in result.output
+
+    lines = result.output.split("\n")
+    bills_index = None
+    food_index = None
+    transport_index = None
+    for i, line in enumerate(lines):
+        if "Bills & Utilities" in line and bills_index is None:
+            bills_index = i
+        if "Food & Dining" in line and food_index is None:
+            food_index = i
+        if "Transportation" in line and transport_index is None:
+            transport_index = i
+
+    assert food_index is not None
+    assert transport_index is not None
+    assert bills_index is not None
+    assert food_index < transport_index
+    assert transport_index < bills_index
 
 
 def test_summary_expand_indentation(
