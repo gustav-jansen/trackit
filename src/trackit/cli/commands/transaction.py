@@ -6,7 +6,8 @@ from decimal import Decimal
 from trackit.domain.transaction import TransactionService
 from trackit.domain.account import AccountService
 from trackit.domain.category import CategoryService
-from trackit.utils.date_parser import parse_date, get_date_range
+from trackit.cli.date_filters import resolve_cli_date_range
+from trackit.utils.date_parser import parse_date
 from trackit.utils.amount_parser import parse_amount
 from trackit.utils.account_resolver import resolve_account
 
@@ -20,11 +21,16 @@ def transaction_group():
 @transaction_group.command("update")
 @click.argument("transaction_id", type=int)
 @click.option("--account", help="Account name or ID")
-@click.option("--date", help="Transaction date (YYYY-MM-DD or relative like 'today', 'yesterday')")
+@click.option(
+    "--date", help="Transaction date (YYYY-MM-DD or relative like 'today', 'yesterday')"
+)
 @click.option("--amount", help="Transaction amount (e.g., 123.45 or -123.45)")
 @click.option("--description", help="Transaction description")
 @click.option("--reference", help="Reference number")
-@click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries') or empty string to clear")
+@click.option(
+    "--category",
+    help="Category path (e.g., 'Food & Dining > Groceries') or empty string to clear",
+)
 @click.option("--notes", help="Notes")
 @click.pass_context
 def update_transaction(
@@ -57,6 +63,7 @@ def update_transaction(
     if account is not None:
         try:
             from trackit.utils.account_resolver import resolve_account
+
             account_id = resolve_account(account_service, account)
         except ValueError as e:
             click.echo(f"Error: {e}", err=True)
@@ -114,8 +121,13 @@ def update_transaction(
 
 
 @transaction_group.command("list")
-@click.option("--start-date", help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')")
-@click.option("--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')")
+@click.option(
+    "--start-date",
+    help="Start date (YYYY-MM-DD or relative like 'last month', 'this year')",
+)
+@click.option(
+    "--end-date", help="End date (YYYY-MM-DD or relative like 'today', 'this month')"
+)
 @click.option("--this-month", is_flag=True, help="Filter to current month")
 @click.option("--this-year", is_flag=True, help="Filter to current year")
 @click.option("--this-week", is_flag=True, help="Filter to current week")
@@ -124,8 +136,15 @@ def update_transaction(
 @click.option("--last-week", is_flag=True, help="Filter to previous week")
 @click.option("--category", help="Category path (e.g., 'Food & Dining > Groceries')")
 @click.option("--account", help="Account name or ID")
-@click.option("--uncategorized", is_flag=True, help="Show only uncategorized transactions")
-@click.option("--verbose", "-v", is_flag=True, help="Show all columns including notes, reference, and unique_id")
+@click.option(
+    "--uncategorized", is_flag=True, help="Show only uncategorized transactions"
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show all columns including notes, reference, and unique_id",
+)
 @click.pass_context
 def list_transactions(
     ctx,
@@ -153,51 +172,20 @@ def list_transactions(
     category_service = CategoryService(db)
     account_service = AccountService(db)
 
-    # Validate period options
-    period_options = [this_month, this_year, this_week, last_month, last_year, last_week]
-    period_count = sum(period_options)
-
-    if period_count > 1:
-        click.echo("Error: Only one period option (--this-month, --this-year, --this-week, --last-month, --last-year, --last-week) can be specified at a time.", err=True)
-        ctx.exit(1)
-
-    if period_count > 0 and (start_date or end_date):
-        click.echo("Error: Period options (--this-month, --this-year, etc.) cannot be combined with --start-date or --end-date.", err=True)
-        ctx.exit(1)
-
-    # Parse dates
-    start = None
-    end = None
-
-    if period_count == 1:
-        # Determine which period option was set
-        if this_month:
-            start, end = get_date_range("this-month")
-        elif this_year:
-            start, end = get_date_range("this-year")
-        elif this_week:
-            start, end = get_date_range("this-week")
-        elif last_month:
-            start, end = get_date_range("last-month")
-        elif last_year:
-            start, end = get_date_range("last-year")
-        elif last_week:
-            start, end = get_date_range("last-week")
-    else:
-        # Use explicit start/end dates if provided
-        if start_date:
-            try:
-                start = parse_date(start_date)
-            except ValueError as e:
-                click.echo(f"Error: Invalid start date: {e}", err=True)
-                ctx.exit(1)
-
-        if end_date:
-            try:
-                end = parse_date(end_date)
-            except ValueError as e:
-                click.echo(f"Error: Invalid end date: {e}", err=True)
-                ctx.exit(1)
+    period_flags = {
+        "this-month": this_month,
+        "this-year": this_year,
+        "this-week": this_week,
+        "last-month": last_month,
+        "last-year": last_year,
+        "last-week": last_week,
+    }
+    start, end = resolve_cli_date_range(
+        ctx,
+        start_date=start_date,
+        end_date=end_date,
+        period_flags=period_flags,
+    )
 
     # Resolve account name to ID if provided
     account_id = None
@@ -306,7 +294,9 @@ def delete_transaction(ctx, transaction_id: int) -> None:
         ctx.exit(1)
 
     # Confirm deletion
-    if not click.confirm(f"Are you sure you want to delete transaction {transaction_id}?"):
+    if not click.confirm(
+        f"Are you sure you want to delete transaction {transaction_id}?"
+    ):
         click.echo("Deletion cancelled.")
         return
 
