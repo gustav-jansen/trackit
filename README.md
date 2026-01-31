@@ -174,6 +174,11 @@ pip install -e .
 
 The summary command displays category totals in a single "Total" column (net total: income + expenses). Categories are grouped by type: Income categories are shown first with an Income subtotal, followed by Expense categories with an Expense subtotal, and finally the overall total. By default, it shows top-level categories. Use `--expand` to show the full category tree with indented subtotals for each category level. Transfer type categories are excluded by default unless `--include-transfers` is used.
 
+**Category path matching**:
+- Paths are case-sensitive.
+- Extra whitespace around path segments is ignored.
+- If a path does not match any category, the summary still shows the overall total but no category rows.
+
 **Columnar grouping options** (`--group-by-month` or `--group-by-year`):
 - Transform the output into a columnar format where each column represents a time period (month or year)
 - First column shows category names, subsequent columns show totals for each period
@@ -497,4 +502,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Contributing
 
 [Add contribution guidelines here]
-
