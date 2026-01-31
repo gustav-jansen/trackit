@@ -8,6 +8,7 @@ database schema changes (e.g., when switching to double-entry bookkeeping).
 from dataclasses import dataclass
 from datetime import datetime, date
 from decimal import Decimal
+from enum import Enum
 from typing import Optional
 
 
@@ -46,6 +47,37 @@ class Transaction:
     category_id: Optional[int]
     notes: Optional[str]
     imported_at: datetime
+
+
+class SummaryGroupBy(str, Enum):
+    """Grouping modes for summary reports."""
+
+    CATEGORY = "category"
+    CATEGORY_MONTH = "category_month"
+    CATEGORY_YEAR = "category_year"
+
+
+@dataclass(frozen=True)
+class SummaryGroup:
+    """Grouped transactions for summary views."""
+
+    group_key: str
+    category_id: Optional[int]
+    category_name: Optional[str]
+    category_type: Optional[int]
+    period_key: Optional[str]
+    transactions: tuple["Transaction", ...]
+    children: tuple["SummaryGroup", ...] = ()
+
+
+@dataclass(frozen=True)
+class SummaryReport:
+    """Summary grouping report returned by domain services."""
+
+    group_by: SummaryGroupBy
+    start_date: Optional[date]
+    end_date: Optional[date]
+    groups: tuple[SummaryGroup, ...]
 
 
 @dataclass(frozen=True)
