@@ -1,6 +1,6 @@
 """Category domain service."""
 
-from typing import Optional
+from typing import Optional, Any
 from trackit.database.base import Database
 from trackit.domain.entities import Category as CategoryEntity
 
@@ -16,7 +16,12 @@ class CategoryService:
         """
         self.db = db
 
-    def create_category(self, name: str, parent_path: Optional[str] = None, category_type: Optional[int] = None) -> int:
+    def create_category(
+        self,
+        name: str,
+        parent_path: Optional[str] = None,
+        category_type: Optional[int] = None,
+    ) -> int:
         """Create a category.
 
         Args:
@@ -37,7 +42,9 @@ class CategoryService:
                 raise ValueError(f"Parent category '{parent_path}' not found")
             parent_id = parent.id
 
-        return self.db.create_category(name=name, parent_id=parent_id, category_type=category_type)
+        return self.db.create_category(
+            name=name, parent_id=parent_id, category_type=category_type
+        )
 
     def get_category(self, category_id: int) -> Optional[CategoryEntity]:
         """Get category by ID.
@@ -80,6 +87,40 @@ class CategoryService:
         """
         return self.db.get_category_tree()
 
+    def get_category_subtree_by_path(
+        self, category_path: Optional[str]
+    ) -> list[dict[str, Any]]:
+        """Get a category subtree by path.
+
+        Args:
+            category_path: Category path (e.g., "Food & Dining > Groceries") or None
+
+        Returns:
+            List containing the matching subtree root, or the full tree if no path provided.
+        """
+        if not category_path:
+            return self.db.get_category_tree()
+
+        category = self.db.get_category_by_path(category_path)
+        if category is None:
+            return []
+
+        full_tree = self.db.get_category_tree()
+
+        def find_subtree(
+            nodes: list[dict[str, Any]], category_id: int
+        ) -> Optional[dict[str, Any]]:
+            for node in nodes:
+                if node.get("id") == category_id:
+                    return node
+                child_match = find_subtree(node.get("children", []), category_id)
+                if child_match is not None:
+                    return child_match
+            return None
+
+        subtree = find_subtree(full_tree, category.id)
+        return [subtree] if subtree is not None else []
+
     def format_category_path(self, category_id: int) -> str:
         """Get full path for a category.
 
@@ -104,4 +145,3 @@ class CategoryService:
             current_parent_id = parent.parent_id
 
         return " > ".join(reversed(path_parts))
-
