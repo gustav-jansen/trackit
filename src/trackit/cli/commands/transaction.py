@@ -7,9 +7,9 @@ from trackit.domain.transaction import TransactionService
 from trackit.domain.account import AccountService
 from trackit.domain.category import CategoryService
 from trackit.cli.date_filters import resolve_cli_date_range
+from trackit.cli.account_resolution import resolve_account_or_exit
 from trackit.utils.date_parser import parse_date
 from trackit.utils.amount_parser import parse_amount
-from trackit.utils.account_resolver import resolve_account
 
 
 @click.group()
@@ -61,13 +61,7 @@ def update_transaction(
     # Resolve account if provided
     account_id = None
     if account is not None:
-        try:
-            from trackit.utils.account_resolver import resolve_account
-
-            account_id = resolve_account(account_service, account)
-        except ValueError as e:
-            click.echo(f"Error: {e}", err=True)
-            ctx.exit(1)
+        account_id = resolve_account_or_exit(ctx, account_service, account)
 
     # Parse date if provided
     txn_date = None
@@ -190,11 +184,7 @@ def list_transactions(
     # Resolve account name to ID if provided
     account_id = None
     if account:
-        try:
-            account_id = resolve_account(account_service, account)
-        except ValueError as e:
-            click.echo(f"Error: {e}", err=True)
-            ctx.exit(1)
+        account_id = resolve_account_or_exit(ctx, account_service, account)
 
     # Handle uncategorized filter
     if uncategorized:

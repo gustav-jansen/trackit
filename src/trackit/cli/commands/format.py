@@ -3,6 +3,7 @@
 import click
 from trackit.domain.csv_format import CSVFormatService
 from trackit.domain.account import AccountService
+from trackit.cli.account_resolution import resolve_account_or_exit
 
 
 @click.group()
@@ -34,7 +35,12 @@ def format_group():
 )
 @click.pass_context
 def create_format(
-    ctx, name: str, account: str, debit_credit_format: bool, negate_debit: bool, negate_credit: bool
+    ctx,
+    name: str,
+    account: str,
+    debit_credit_format: bool,
+    negate_debit: bool,
+    negate_credit: bool,
 ):
     """Create a new CSV format."""
     db = ctx.obj["db"]
@@ -42,12 +48,7 @@ def create_format(
     account_service = AccountService(db)
 
     # Resolve account name to ID
-    try:
-        from trackit.utils.account_resolver import resolve_account
-        account_id = resolve_account(account_service, account)
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    account_id = resolve_account_or_exit(ctx, account_service, account)
 
     try:
         format_id = service.create_format(
@@ -113,12 +114,7 @@ def list_formats(ctx, account):
 
     account_id = None
     if account:
-        try:
-            from trackit.utils.account_resolver import resolve_account
-            account_id = resolve_account(account_service, account)
-        except ValueError as e:
-            click.echo(f"Error: {e}", err=True)
-            ctx.exit(1)
+        account_id = resolve_account_or_exit(ctx, account_service, account)
 
     formats = service.list_formats(account_id=account_id)
     if not formats:
@@ -167,7 +163,9 @@ def show_format(ctx, format_name: str):
     click.echo(f"\nFormat: {fmt.name}")
     click.echo(f"ID: {fmt.id}")
     click.echo(f"Account ID: {fmt.account_id}")
-    click.echo(f"Type: {'Debit/Credit Format' if fmt.is_debit_credit_format else 'Standard Format'}")
+    click.echo(
+        f"Type: {'Debit/Credit Format' if fmt.is_debit_credit_format else 'Standard Format'}"
+    )
     if fmt.is_debit_credit_format:
         click.echo(f"  Negate Debit: {'Yes' if fmt.negate_debit else 'No'}")
         click.echo(f"  Negate Credit: {'Yes' if fmt.negate_credit else 'No'}")
@@ -235,12 +233,7 @@ def update_format(
     # Resolve account if provided
     account_id = None
     if account is not None:
-        try:
-            from trackit.utils.account_resolver import resolve_account
-            account_id = resolve_account(account_service, account)
-        except ValueError as e:
-            click.echo(f"Error: {e}", err=True)
-            ctx.exit(1)
+        account_id = resolve_account_or_exit(ctx, account_service, account)
 
     try:
         service.update_format(
@@ -257,7 +250,9 @@ def update_format(
         if account is not None:
             click.echo(f"  Reassigned to account: '{account}'")
         if debit_credit_format is not None:
-            click.echo(f"  Debit/Credit format: {'enabled' if debit_credit_format else 'disabled'}")
+            click.echo(
+                f"  Debit/Credit format: {'enabled' if debit_credit_format else 'disabled'}"
+            )
         if negate_debit is not None:
             click.echo(f"  Negate debit: {'enabled' if negate_debit else 'disabled'}")
         if negate_credit is not None:
@@ -286,7 +281,9 @@ def delete_format(ctx, format_name: str) -> None:
         ctx.exit(1)
 
     # Confirm deletion
-    if not click.confirm(f"Are you sure you want to delete format '{format_name}' (ID: {fmt.id})?"):
+    if not click.confirm(
+        f"Are you sure you want to delete format '{format_name}' (ID: {fmt.id})?"
+    ):
         click.echo("Deletion cancelled.")
         return
 
@@ -301,4 +298,3 @@ def delete_format(ctx, format_name: str) -> None:
 def register_commands(cli):
     """Register format commands with main CLI."""
     cli.add_command(format_group, name="format")
-

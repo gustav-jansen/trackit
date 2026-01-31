@@ -2,6 +2,7 @@
 
 import click
 from trackit.domain.account import AccountService
+from trackit.cli.account_resolution import resolve_account_or_exit
 
 
 @click.group()
@@ -77,12 +78,7 @@ def rename_account(ctx, account: str, new_name: str, bank: str | None) -> None:
     service = AccountService(db)
 
     # Resolve account
-    try:
-        from trackit.utils.account_resolver import resolve_account
-        account_id = resolve_account(service, account)
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    account_id = resolve_account_or_exit(ctx, service, account)
 
     try:
         service.rename_account(account_id=account_id, name=new_name, bank_name=bank)
@@ -114,12 +110,7 @@ def delete_account(ctx, account: str) -> None:
     service = AccountService(db)
 
     # Resolve account
-    try:
-        from trackit.utils.account_resolver import resolve_account
-        account_id = resolve_account(service, account)
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    account_id = resolve_account_or_exit(ctx, service, account)
 
     # Get account info for display
     account_obj = service.get_account(account_id)
@@ -134,18 +125,22 @@ def delete_account(ctx, account: str) -> None:
     if transaction_count > 0 or format_count > 0:
         parts = []
         if transaction_count > 0:
-            parts.append(f"{transaction_count} transaction{'s' if transaction_count != 1 else ''}")
+            parts.append(
+                f"{transaction_count} transaction{'s' if transaction_count != 1 else ''}"
+            )
         if format_count > 0:
             parts.append(f"{format_count} CSV format{'s' if format_count != 1 else ''}")
         click.echo(
             f"Error: Cannot delete account '{account_obj.name}': it has {', '.join(parts)}.",
-            err=True
+            err=True,
         )
         click.echo("Please reassign or delete them first.", err=True)
         ctx.exit(1)
 
     # Confirm deletion
-    if not click.confirm(f"Are you sure you want to delete account '{account_obj.name}' (ID: {account_id})?"):
+    if not click.confirm(
+        f"Are you sure you want to delete account '{account_obj.name}' (ID: {account_id})?"
+    ):
         click.echo("Deletion cancelled.")
         return
 
@@ -160,4 +155,3 @@ def delete_account(ctx, account: str) -> None:
 def register_commands(cli):
     """Register account commands with main CLI."""
     cli.add_command(account_group, name="account")
-
