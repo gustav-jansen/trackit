@@ -277,14 +277,10 @@ class TransactionService:
             List of transaction entities
         """
         summary_service = SummaryService(self.db)
-        category_filter = summary_service.resolve_category_filter(category_path)
-        if category_filter.is_missing:
-            return []
-
-        return self.db.get_summary_transactions(
+        return summary_service.get_filtered_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_id=category_filter.category_id,
+            category_path=category_path,
             include_transfers=include_transfers,
         )
 

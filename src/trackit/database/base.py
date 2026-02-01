@@ -342,6 +342,8 @@ class Database(ABC):
     ) -> list[Transaction]:
         """Get transactions for summary views.
 
-        Includes descendant categories when category_id is provided.
+        This returns raw transactions filtered only by date and exact category_id.
+        Summary-specific filtering (descendants, transfer exclusion) is handled
+        in the domain layer.
         """
         pass

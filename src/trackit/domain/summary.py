@@ -186,12 +186,35 @@ class SummaryService:
         if category_filter.is_missing:
             return []
 
-        return self.db.get_summary_transactions(
+        transactions = self.db.list_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_id=category_filter.category_id,
-            include_transfers=include_transfers,
         )
+
+        if not transactions:
+            return []
+
+        category_tree = self.db.get_category_tree()
+        descendant_map = self.build_descendant_map(category_tree)
+
+        if category_filter.category_id is not None:
+            descendant_ids = descendant_map.get(
+                category_filter.category_id, {category_filter.category_id}
+            )
+            transactions = [
+                txn for txn in transactions if txn.category_id in descendant_ids
+            ]
+
+        if not include_transfers:
+            transfer_ids = self.get_transfer_category_ids(category_tree, descendant_map)
+            if transfer_ids:
+                transactions = [
+                    txn
+                    for txn in transactions
+                    if txn.category_id is None or txn.category_id not in transfer_ids
+                ]
+
+        return transactions
 
     def get_category_summaries(
         self,
@@ -240,6 +263,26 @@ class SummaryService:
 
         subtree = find_subtree(full_tree, category.id)
         return [subtree] if subtree is not None else []
+
+    def get_transfer_category_ids(
+        self,
+        category_tree: list[CategoryTreeNode],
+        descendant_map: dict[int, set[int]],
+    ) -> set[int]:
+        """Collect transfer category IDs including descendants."""
+        transfer_ids: set[int] = set()
+
+        def visit(node: CategoryTreeNode) -> None:
+            if node.category_type == 2:
+                transfer_ids.update(descendant_map.get(node.id, {node.id}))
+                return
+            for child in node.children:
+                visit(child)
+
+        for root in category_tree or []:
+            visit(root)
+
+        return transfer_ids
 
     def build_category_index(
         self, category_tree: list[CategoryTreeNode]

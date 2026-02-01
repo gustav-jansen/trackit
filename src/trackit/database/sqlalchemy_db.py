@@ -4,7 +4,6 @@ from typing import Optional
 from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 
 from trackit.database.base import Database
 from trackit.database.models import (
@@ -537,23 +536,7 @@ class SQLAlchemyDatabase(Database):
         if end_date is not None:
             query = query.filter(Transaction.date <= end_date)
         if category_id is not None:
-            descendant_ids = self._get_all_descendant_ids(category_id)
-            query = query.filter(Transaction.category_id.in_(descendant_ids))
-        if not include_transfers:
-            transfer_categories = (
-                session.query(Category).filter(Category.category_type == 2).all()
-            )
-            transfer_ids = set()
-            for cat in transfer_categories:
-                transfer_ids.update(self._get_all_descendant_ids(cat.id))
-
-            if transfer_ids:
-                query = query.filter(
-                    or_(
-                        Transaction.category_id.is_(None),
-                        ~Transaction.category_id.in_(transfer_ids),
-                    )
-                )
+            query = query.filter(Transaction.category_id == category_id)
 
         transactions = query.order_by(
             Transaction.date.desc(), Transaction.id.desc()
