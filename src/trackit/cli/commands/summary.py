@@ -8,22 +8,16 @@ from trackit.utils.date_parser import get_last_six_months_range
 
 
 def _display_columnar_summary_standard(
-    summary_service,
-    summaries,
+    sections,
     period_keys,
-    period_transactions_map,
-    include_transfers,
-    descendant_map,
+    period_overall_totals,
 ):
     """Display columnar summary for standard view.
 
     Args:
-        summary_service: SummaryService instance
-        summaries: List of summary dicts from service.get_summary()
+        sections: Ordered SummarySection list
         period_keys: Sorted list of period keys (e.g., ["2024-01", "2024-02"])
-        period_transactions_map: Dict mapping period key to list of transactions
-        include_transfers: Whether to include transfers
-        descendant_map: Map of category IDs to descendant ID sets
+        period_overall_totals: Dict mapping period key to total
     """
     # Column widths
     CATEGORY_WIDTH = 50
@@ -41,230 +35,59 @@ def _display_columnar_summary_standard(
         separator += "-" * (PERIOD_COLUMN_WIDTH + 3)
     click.echo(separator)
 
-    # Group summaries by category type
-    income_summaries = []
-    transfer_summaries = []
-    expense_summaries = []
-
-    for s in summaries:
-        # Calculate total across all periods for this category
-        total = sum(
-            summary_service.calculate_category_total_for_period(
-                descendant_map,
-                s.get("category_id"),
-                period_transactions_map.get(period_key, []),
-            )
-            for period_key in period_keys
-        )
-        if total == 0:
-            continue
-
-        cat_type = s.get("category_type")
-        if cat_type == 1:  # Income
-            income_summaries.append(s)
-        elif cat_type == 2 and include_transfers:  # Transfer
-            transfer_summaries.append(s)
-        else:  # Expense (0) or Uncategorized (None)
-            expense_summaries.append(s)
-
-    # Sort each group by absolute value (descending), then by name
-    income_summaries.sort(
-        key=lambda x: (
-            -abs(
-                sum(
-                    summary_service.calculate_category_total_for_period(
-                        descendant_map,
-                        x.get("category_id"),
-                        period_transactions_map.get(period_key, []),
-                    )
-                    for period_key in period_keys
-                )
-            ),
-            x["category_name"] or "",
-        )
-    )
-    transfer_summaries.sort(
-        key=lambda x: (
-            -abs(
-                sum(
-                    summary_service.calculate_category_total_for_period(
-                        descendant_map,
-                        x.get("category_id"),
-                        period_transactions_map.get(period_key, []),
-                    )
-                    for period_key in period_keys
-                )
-            ),
-            x["category_name"] or "",
-        )
-    )
-    expense_summaries.sort(
-        key=lambda x: (
-            -abs(
-                sum(
-                    summary_service.calculate_category_total_for_period(
-                        descendant_map,
-                        x.get("category_id"),
-                        period_transactions_map.get(period_key, []),
-                    )
-                    for period_key in period_keys
-                )
-            ),
-            x["category_name"] or "",
-        )
-    )
-
-    # Display Income categories
-    if income_summaries:
-        click.echo("Income")
+    for section in sections:
+        click.echo(section.name)
         click.echo(
             "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
         )
-    income_subtotals = [0.0] * len(period_keys)
-    for s in income_summaries:
-        category_name = s["category_name"] or "Uncategorized"
-        row = f"    {category_name:<{CATEGORY_WIDTH - 4}}"
-        category_id = s.get("category_id")
-        for i, period_key in enumerate(period_keys):
-            period_txns = period_transactions_map.get(period_key, [])
-            total = summary_service.calculate_category_total_for_period(
-                descendant_map, category_id, period_txns
-            )
-            income_subtotals[i] += total
-            if total == 0:
-                row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-            else:
-                row += f"   ${total:>13,.2f}"
-        click.echo(row)
+        for row in section.rows:
+            category_name = row.category_name or "Uncategorized"
+            row_display = f"    {category_name:<{CATEGORY_WIDTH - 4}}"
+            for period_key in period_keys:
+                total = row.period_totals.get(period_key, 0.0)
+                if total == 0:
+                    row_display += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
+                else:
+                    row_display += f"   ${total:>13,.2f}"
+            click.echo(row_display)
 
-    # Income subtotal
-    if income_summaries:
         click.echo(separator)
-        subtotal_row = f"{'Income Subtotal':<{CATEGORY_WIDTH}}"
-        for i, period_key in enumerate(period_keys):
-            if income_subtotals[i] == 0:
+        subtotal_row = f"{section.name} Subtotal".ljust(CATEGORY_WIDTH)
+        for period_key in period_keys:
+            subtotal = section.period_subtotals.get(period_key, 0.0)
+            if subtotal == 0:
                 subtotal_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
             else:
-                subtotal_row += f"   ${income_subtotals[i]:>13,.2f}"
+                subtotal_row += f"   ${subtotal:>13,.2f}"
         click.echo(subtotal_row)
         click.echo(
             "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
         )
-        click.echo()
-
-    # Display Transfer categories
-    if transfer_summaries:
-        click.echo("Transfer")
-        click.echo(
-            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-        )
-    transfer_subtotals = [0.0] * len(period_keys)
-    for s in transfer_summaries:
-        category_name = s["category_name"] or "Uncategorized"
-        row = f"    {category_name:<{CATEGORY_WIDTH - 4}}"
-        category_id = s.get("category_id")
-        for i, period_key in enumerate(period_keys):
-            period_txns = period_transactions_map.get(period_key, [])
-            total = summary_service.calculate_category_total_for_period(
-                descendant_map, category_id, period_txns
-            )
-            transfer_subtotals[i] += total
-            if total == 0:
-                row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-            else:
-                row += f"   ${total:>13,.2f}"
-        click.echo(row)
-
-    # Transfer subtotal
-    if transfer_summaries:
-        click.echo(separator)
-        subtotal_row = f"{'Transfer Subtotal':<{CATEGORY_WIDTH}}"
-        for i, period_key in enumerate(period_keys):
-            if transfer_subtotals[i] == 0:
-                subtotal_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-            else:
-                subtotal_row += f"   ${transfer_subtotals[i]:>13,.2f}"
-        click.echo(subtotal_row)
-        click.echo(
-            "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-        )
-        click.echo()
-
-    # Display Expense categories
-    if expense_summaries:
-        click.echo("Expense")
-        click.echo(
-            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-        )
-    expense_subtotals = [0.0] * len(period_keys)
-    for s in expense_summaries:
-        category_name = s["category_name"] or "Uncategorized"
-        row = f"    {category_name:<{CATEGORY_WIDTH - 4}}"
-        category_id = s.get("category_id")
-        for i, period_key in enumerate(period_keys):
-            period_txns = period_transactions_map.get(period_key, [])
-            total = summary_service.calculate_category_total_for_period(
-                descendant_map, category_id, period_txns
-            )
-            expense_subtotals[i] += total
-            if total == 0:
-                row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-            else:
-                row += f"   ${total:>13,.2f}"
-        click.echo(row)
-
-    # Expense subtotal
-    if expense_summaries:
-        click.echo(separator)
-        subtotal_row = f"{'Expense Subtotal':<{CATEGORY_WIDTH}}"
-        for i, period_key in enumerate(period_keys):
-            if expense_subtotals[i] == 0:
-                subtotal_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-            else:
-                subtotal_row += f"   ${expense_subtotals[i]:>13,.2f}"
-        click.echo(subtotal_row)
-        click.echo(
-            "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-        )
-    else:
-        click.echo(separator)
+        if section.name in ("Income", "Transfer"):
+            click.echo()
 
     # Overall total
-    overall_totals = [0.0] * len(period_keys)
-    for period_key in period_keys:
-        period_txns = period_transactions_map.get(period_key, [])
-        overall_totals[period_keys.index(period_key)] = sum(
-            float(txn.amount) for txn in period_txns
-        )
-
     total_row = f"{'TOTAL':<{CATEGORY_WIDTH}}"
     for i, period_key in enumerate(period_keys):
-        if overall_totals[i] == 0:
+        total = period_overall_totals.get(period_key, 0.0)
+        if total == 0:
             total_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
         else:
-            total_row += f"   ${overall_totals[i]:>13,.2f}"
+            total_row += f"   ${total:>13,.2f}"
     click.echo(total_row)
 
 
 def _display_columnar_summary_expanded(
-    summary_service,
-    category_tree,
+    sections,
     period_keys,
-    period_transactions_map,
-    include_transfers,
-    has_uncategorized,
-    descendant_map,
+    period_overall_totals,
 ):
     """Display columnar summary for expanded view.
 
     Args:
-        summary_service: SummaryService instance
-        category_tree: Category tree structure
+        sections: Ordered SummarySection list
         period_keys: Sorted list of period keys
-        period_transactions_map: Dict mapping period key to list of transactions
-        include_transfers: Whether to include transfers
-        has_uncategorized: Whether there are uncategorized transactions
-        descendant_map: Map of category IDs to descendant ID sets
+        period_overall_totals: Dict mapping period key to total
     """
     # Column widths
     CATEGORY_WIDTH = 50
@@ -283,290 +106,96 @@ def _display_columnar_summary_expanded(
         separator += "-" * (PERIOD_COLUMN_WIDTH + 3)
     click.echo(separator)
 
-    # Group category tree by type
-    income_tree = []
-    transfer_tree = []
-    expense_tree = []
-
-    if category_tree:
-        for cat in category_tree:
-            cat_type = cat.category_type
-            if cat_type is None:
-                cat_type = summary_service.get_category_type(cat.id)
-            if cat_type == 1:  # Income
-                income_tree.append(cat)
-            elif cat_type == 2 and include_transfers:  # Transfer
-                transfer_tree.append(cat)
-            else:  # Expense (0) or None
-                expense_tree.append(cat)
-
-    # Display Income categories
-    if income_tree:
-        click.echo("Income")
+    for section in sections:
+        click.echo(section.name)
         click.echo(
             "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
         )
-        income_subtotals = [0.0] * len(period_keys)
-        _display_columnar_category_tree(
-            summary_service,
-            income_tree,
+        _display_columnar_summary_rows(
+            section.rows,
             period_keys,
-            period_transactions_map,
-            descendant_map,
-            1,
-            income_subtotals,
+            indent=1,
         )
-        if any(st != 0 for st in income_subtotals):
-            click.echo(separator)
-            subtotal_row = f"{'Income Subtotal':<{CATEGORY_WIDTH}}"
-            for i, period_key in enumerate(period_keys):
-                if income_subtotals[i] == 0:
-                    subtotal_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-                else:
-                    subtotal_row += f"   ${income_subtotals[i]:>13,.2f}"
-            click.echo(subtotal_row)
-            click.echo(
-                "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-            )
-            click.echo()
-
-    # Display Transfer categories
-    if transfer_tree:
-        click.echo("Transfer")
-        click.echo(
-            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-        )
-        transfer_subtotals = [0.0] * len(period_keys)
-        _display_columnar_category_tree(
-            summary_service,
-            transfer_tree,
-            period_keys,
-            period_transactions_map,
-            descendant_map,
-            1,
-            transfer_subtotals,
-        )
-        if any(st != 0 for st in transfer_subtotals):
-            click.echo(separator)
-            subtotal_row = f"{'Transfer Subtotal':<{CATEGORY_WIDTH}}"
-            for i, period_key in enumerate(period_keys):
-                if transfer_subtotals[i] == 0:
-                    subtotal_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-                else:
-                    subtotal_row += f"   ${transfer_subtotals[i]:>13,.2f}"
-            click.echo(subtotal_row)
-            click.echo(
-                "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-            )
-            click.echo()
-
-    # Display Expense categories
-    if expense_tree or has_uncategorized:
-        click.echo("Expense")
-        click.echo(
-            "*" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
-        )
-    expense_subtotals = [0.0] * len(period_keys)
-    if expense_tree:
-        _display_columnar_category_tree(
-            summary_service,
-            expense_tree,
-            period_keys,
-            period_transactions_map,
-            descendant_map,
-            1,
-            expense_subtotals,
-        )
-
-    # Display uncategorized if present
-    if has_uncategorized:
-        indent_str = " " * INDENT_SIZE
-        category_name = "Uncategorized"
-        category_width = CATEGORY_WIDTH - INDENT_SIZE
-        row = f"{indent_str}{category_name:<{category_width}}"
-        for i, period_key in enumerate(period_keys):
-            period_txns = period_transactions_map.get(period_key, [])
-            total = summary_service.calculate_category_total_for_period(
-                descendant_map, None, period_txns
-            )
-            expense_subtotals[i] += total
-            if total == 0:
-                row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
-            else:
-                row += f"   ${total:>13,.2f}"
-        click.echo(row)
-
-    # Expense subtotal
-    if expense_tree or has_uncategorized:
         click.echo(separator)
-        subtotal_row = f"{'Expense Subtotal':<{CATEGORY_WIDTH}}"
-        for i, period_key in enumerate(period_keys):
-            if expense_subtotals[i] == 0:
+        subtotal_row = f"{section.name} Subtotal".ljust(CATEGORY_WIDTH)
+        for period_key in period_keys:
+            subtotal = section.period_subtotals.get(period_key, 0.0)
+            if subtotal == 0:
                 subtotal_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
             else:
-                subtotal_row += f"   ${expense_subtotals[i]:>13,.2f}"
+                subtotal_row += f"   ${subtotal:>13,.2f}"
         click.echo(subtotal_row)
         click.echo(
             "=" * (CATEGORY_WIDTH + len(period_keys) * (PERIOD_COLUMN_WIDTH + 3))
         )
+        if section.name in ("Income", "Transfer"):
+            click.echo()
 
     # Overall total
-    overall_totals = [0.0] * len(period_keys)
-    for period_key in period_keys:
-        period_txns = period_transactions_map.get(period_key, [])
-        overall_totals[period_keys.index(period_key)] = sum(
-            float(txn.amount) for txn in period_txns
-        )
-
     total_row = f"{'TOTAL':<{CATEGORY_WIDTH}}"
     for i, period_key in enumerate(period_keys):
-        if overall_totals[i] == 0:
+        total = period_overall_totals.get(period_key, 0.0)
+        if total == 0:
             total_row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
         else:
-            total_row += f"   ${overall_totals[i]:>13,.2f}"
+            total_row += f"   ${total:>13,.2f}"
     click.echo(total_row)
 
 
-def _display_columnar_category_tree(
-    summary_service,
-    category_tree,
+def _display_columnar_summary_rows(
+    rows,
     period_keys,
-    period_transactions_map,
-    descendant_map,
     indent=0,
-    subtotals=None,
 ):
-    """Recursively display category tree in columnar format.
-
-    Args:
-        summary_service: SummaryService instance
-        category_tree: List of category tree nodes with children
-        period_keys: Sorted list of period keys
-        period_transactions_map: Dict mapping period key to list of transactions
-        descendant_map: Map of category IDs to descendant ID sets
-        indent: Current indent level
-        subtotals: List to accumulate subtotals (modified in place)
-    """
-    if subtotals is None:
-        subtotals = [0.0] * len(period_keys)
-
+    """Recursively display summary rows in columnar format."""
     PERIOD_COLUMN_WIDTH = 14  # Enough for single digit millions: -$9,999,999.99
     CATEGORY_WIDTH = 50
     INDENT_SIZE = 4
-
-    # Sort categories by total value (descending), then by name
-    def get_sort_key(cat):
-        total = sum(
-            summary_service.calculate_category_total_for_period(
-                descendant_map,
-                cat.id,
-                period_transactions_map.get(period_key, []),
-            )
-            for period_key in period_keys
-        )
-        return (-abs(total), cat.name)
-
-    sorted_categories = sorted(category_tree, key=get_sort_key)
-
-    for i, cat in enumerate(sorted_categories):
-        # Calculate totals for each period
-        period_totals = []
-        for period_key in period_keys:
-            period_txns = period_transactions_map.get(period_key, [])
-            total = summary_service.calculate_category_total_for_period(
-                descendant_map, cat.id, period_txns
-            )
-            period_totals.append(total)
-
-        # Skip if all periods are zero
-        if all(t == 0 for t in period_totals):
-            continue
-
-        # Add blank line before top-level categories (except the first one)
-        if indent == 0 and i > 0:
-            click.echo()
-
+    for row in rows:
         indent_str = " " * (INDENT_SIZE * indent)
-        category_name = cat.name
         category_width = CATEGORY_WIDTH - (INDENT_SIZE * indent)
-
-        row = f"{indent_str}{category_name:<{category_width}}"
-        for j, period_key in enumerate(period_keys):
-            total = period_totals[j]
-            subtotals[j] += total
+        display = f"{indent_str}{row.category_name:<{category_width}}"
+        for period_key in period_keys:
+            total = row.period_totals.get(period_key, 0.0)
             if total == 0:
-                row += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
+                display += f"   {'-':>{PERIOD_COLUMN_WIDTH}}"
             else:
-                row += f"   ${total:>13,.2f}"
-        click.echo(row)
+                display += f"   ${total:>13,.2f}"
+        click.echo(display)
 
-        # Display children recursively
-        if cat.children:
-            _display_columnar_category_tree(
-                summary_service,
-                list(cat.children),
+        if row.children:
+            _display_columnar_summary_rows(
+                row.children,
                 period_keys,
-                period_transactions_map,
-                descendant_map,
                 indent + 1,
-                subtotals,
             )
 
 
 def _display_expanded_summary(
-    summary_service,
-    descendant_map,
-    category_tree,
-    transactions,
+    rows,
     indent=0,
     is_first=True,
 ):
     """Recursively display category tree with totals, sorted by value (highest first)."""
-
-    # Sort categories by total value (descending), then by name for ties
-    def get_sort_key(cat):
-        total = summary_service.calculate_category_total(
-            descendant_map, cat.id, transactions
-        )
-        return (-abs(total), cat.name)  # Negative abs for descending order
-
-    sorted_categories = sorted(category_tree, key=get_sort_key)
-
-    # Use 4 spaces per indent level for larger indentation
     INDENT_SIZE = 4
-
-    for i, cat in enumerate(sorted_categories):
-        total = summary_service.calculate_category_total(
-            descendant_map, cat.id, transactions
-        )
-
-        # Skip categories with no transactions (total includes all descendants)
-        if total == 0:
+    for i, row in enumerate(rows):
+        if row.total == 0:
             continue
 
-        # Add blank line before top-level categories (except the first one)
         if indent == 0 and not (is_first and i == 0):
             click.echo()
 
         indent_str = " " * (INDENT_SIZE * indent)
-        category_name = cat.name
-        total_str = f"${total:,.2f}"
-        # Calculate available width for category name (50 - indent length)
+        total_str = f"${row.total:,.2f}"
         category_width = 50 - (INDENT_SIZE * indent)
-        # Amount should move right as indent increases (deeper categories have values more to the right)
-        # Base amount position is 20 chars from right, add indent to move it further right
         amount_width = 20 + (INDENT_SIZE * indent)
         click.echo(
-            f"{indent_str}{category_name:<{category_width}} {total_str:>{amount_width}}"
+            f"{indent_str}{row.category_name:<{category_width}} {total_str:>{amount_width}}"
         )
 
-        # Display children recursively (they will be sorted in the recursive call)
-        if cat.children:
+        if row.children:
             _display_expanded_summary(
-                summary_service,
-                descendant_map,
-                list(cat.children),
-                transactions,
+                row.children,
                 indent + 1,
                 is_first=False,
             )
@@ -679,276 +308,70 @@ def summary(
 
         if expand:
             # Expanded columnar view
-            category_tree = list(report.category_tree)
-            descendant_map = report.descendant_map
-
-            has_uncategorized = any(
-                txn.category_id is None for txn in report.transactions
-            )
-
             click.echo("\nCategory Summary (Expanded):")
             _display_columnar_summary_expanded(
-                summary_service,
-                category_tree,
+                report.period_expanded_sections,
                 period_keys,
-                period_transactions_map,
-                include_transfers,
-                has_uncategorized,
-                descendant_map,
+                report.period_overall_totals,
             )
         else:
             # Standard columnar view
-            summaries = list(report.category_summaries)
-
-            if not summaries:
-                click.echo("No transactions found.")
-                return
-
             click.echo("\nCategory Summary:")
-            category_tree = list(report.category_tree)
-            descendant_map = report.descendant_map
             _display_columnar_summary_standard(
-                summary_service,
-                summaries,
+                report.period_sections,
                 period_keys,
-                period_transactions_map,
-                include_transfers,
-                descendant_map,
+                report.period_overall_totals,
             )
         return
 
     # Calculate overall total from all filtered transactions
-    overall_total = sum(float(txn.amount) for txn in report.transactions)
+    overall_total = report.overall_total
 
     if expand:
         # Expanded view: show full category tree
-        category_tree = list(report.category_tree)
-        descendant_map = report.descendant_map
-
-        # Also include uncategorized if there are any
-        has_uncategorized = any(txn.category_id is None for txn in report.transactions)
-
         click.echo("\nCategory Summary (Expanded):")
         click.echo("-" * 80)
         click.echo(f"{'Category':<50} {'Total':>20}")
         click.echo("-" * 80)
-
-        # Group category tree by type: Income (1), Transfer (2), Expense (0)
-        income_tree = []
-        transfer_tree = []
-        expense_tree = []
-        uncategorized_total = 0.0
-
-        if category_tree:
-            for cat in category_tree:
-                # Use category_type from tree if available, otherwise look it up
-                cat_type = cat.category_type
-                if cat_type is None:
-                    cat_type = summary_service.get_category_type(cat.id)
-                if cat_type == 1:  # Income
-                    income_tree.append(cat)
-                elif (
-                    cat_type == 2 and include_transfers
-                ):  # Transfer (only if including transfers)
-                    transfer_tree.append(cat)
-                else:  # Expense (0) or None
-                    expense_tree.append(cat)
-
-        # Calculate subtotals
-        income_subtotal = 0.0
-        transfer_subtotal = 0.0
-        expense_subtotal = 0.0
-
-        # Display Income categories first
-        if income_tree:
-            click.echo("Income")
+        for section in report.expanded_sections:
+            click.echo(section.name)
             click.echo("*" * 80)
-            for cat in income_tree:
-                total = summary_service.calculate_category_total(
-                    descendant_map, cat.id, list(report.transactions)
-                )
-                income_subtotal += total
             _display_expanded_summary(
-                summary_service,
-                descendant_map,
-                income_tree,
-                list(report.transactions),
+                section.rows,
                 indent=1,
                 is_first=True,
             )
-            if income_subtotal != 0:
-                click.echo("-" * 80)
-                income_subtotal_str = f"${income_subtotal:,.2f}"
-                click.echo(f"{'Income Subtotal':<50} {income_subtotal_str:>20}")
-                click.echo("=" * 80)
-                click.echo()
-
-        # Display Transfer categories (only if including transfers)
-        if transfer_tree:
-            click.echo("Transfer")
-            click.echo("*" * 80)
-            for cat in transfer_tree:
-                total = summary_service.calculate_category_total(
-                    descendant_map, cat.id, list(report.transactions)
-                )
-                transfer_subtotal += total
-            _display_expanded_summary(
-                summary_service,
-                descendant_map,
-                transfer_tree,
-                list(report.transactions),
-                indent=1,
-                is_first=True,
-            )
-            if transfer_subtotal != 0:
-                click.echo("-" * 80)
-                transfer_subtotal_str = f"${transfer_subtotal:,.2f}"
-                click.echo(f"{'Transfer Subtotal':<50} {transfer_subtotal_str:>20}")
-                click.echo("=" * 80)
-                click.echo()
-
-        # Display Expense categories
-        if expense_tree or has_uncategorized:
-            click.echo("Expense")
-            click.echo("*" * 80)
-        if expense_tree:
-            for cat in expense_tree:
-                total = summary_service.calculate_category_total(
-                    descendant_map, cat.id, list(report.transactions)
-                )
-                expense_subtotal += total
-            _display_expanded_summary(
-                summary_service,
-                descendant_map,
-                expense_tree,
-                list(report.transactions),
-                indent=1,
-                is_first=True,
-            )
-
-        # Display uncategorized if present (treated as Expense)
-        if has_uncategorized:
-            uncategorized_total = summary_service.calculate_category_total(
-                descendant_map, None, list(report.transactions)
-            )
-            expense_subtotal += uncategorized_total
-            if uncategorized_total != 0:
-                total_str = f"${uncategorized_total:,.2f}"
-                click.echo(f"    {'Uncategorized':<46} {total_str:>20}")
-
-        # Show Expense subtotal if there are expense categories or uncategorized
-        if expense_tree or has_uncategorized:
             click.echo("-" * 80)
-            expense_subtotal_str = f"${expense_subtotal:,.2f}"
-            click.echo(f"{'Expense Subtotal':<50} {expense_subtotal_str:>20}")
+            subtotal_str = f"${section.subtotal:,.2f}"
+            click.echo(f"{section.name} Subtotal".ljust(50) + f" {subtotal_str:>20}")
             click.echo("=" * 80)
+            if section.name in ("Income", "Transfer"):
+                click.echo()
     else:
         # Standard view: show top-level categories (or subcategories if category filter is specified)
-        summaries = list(report.category_summaries)
-
-        if not summaries:
-            click.echo("No transactions found.")
-            return
-
         # Display summary
         click.echo("\nCategory Summary:")
         click.echo("-" * 80)
         click.echo(f"{'Category':<50} {'Total':>20}")
         click.echo("-" * 80)
-
-        # Group summaries by category type: Income (1), Transfer (2), Expense (0)
-        # Uncategorized (None) will be treated as Expense type
-        income_summaries = []
-        transfer_summaries = []
-        expense_summaries = []
-
-        for s in summaries:
-            total = s["expenses"] + s["income"]  # Net total
-            # Skip categories with no transactions
-            if total == 0:
-                continue
-
-            cat_type = s.get("category_type")
-            if cat_type == 1:  # Income
-                income_summaries.append(s)
-            elif (
-                cat_type == 2 and include_transfers
-            ):  # Transfer (only if including transfers)
-                transfer_summaries.append(s)
-            else:  # Expense (0) or Uncategorized (None)
-                expense_summaries.append(s)
-
-        # Sort each group by absolute value (descending), then by name for ties
-        income_summaries.sort(
-            key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or "")
-        )
-        transfer_summaries.sort(
-            key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or "")
-        )
-        expense_summaries.sort(
-            key=lambda x: (-abs(x["expenses"] + x["income"]), x["category_name"] or "")
-        )
-
-        # Display Income categories first
-        if income_summaries:
-            click.echo("Income")
+        has_expense_section = False
+        for section in report.sections:
+            click.echo(section.name)
             click.echo("*" * 80)
-        income_subtotal = 0.0
-        for s in income_summaries:
-            total = s["expenses"] + s["income"]
-            income_subtotal += total
-            category_name = s["category_name"] or "Uncategorized"
-            total_str = f"${total:,.2f}"
-            click.echo(f"    {category_name:<46} {total_str:>20}")
+            for row in section.rows:
+                total_str = f"${row.total:,.2f}"
+                click.echo(f"    {row.category_name:<46} {total_str:>20}")
 
-        # Show Income subtotal if there are income categories
-        if income_summaries:
             click.echo("-" * 80)
-            income_subtotal_str = f"${income_subtotal:,.2f}"
-            click.echo(f"{'Income Subtotal':<50} {income_subtotal_str:>20}")
+            subtotal_str = f"${section.subtotal:,.2f}"
+            click.echo(f"{section.name} Subtotal".ljust(50) + f" {subtotal_str:>20}")
             click.echo("=" * 80)
-            click.echo()
+            if section.name in ("Income", "Transfer"):
+                click.echo()
+            if section.name == "Expense":
+                has_expense_section = True
 
-        # Display Transfer categories (only if including transfers)
-        if transfer_summaries:
-            click.echo("Transfer")
-            click.echo("*" * 80)
-        transfer_subtotal = 0.0
-        for s in transfer_summaries:
-            total = s["expenses"] + s["income"]
-            transfer_subtotal += total
-            category_name = s["category_name"] or "Uncategorized"
-            total_str = f"${total:,.2f}"
-            click.echo(f"    {category_name:<46} {total_str:>20}")
-
-        # Show Transfer subtotal if there are transfer categories
-        if transfer_summaries:
-            click.echo("-" * 80)
-            transfer_subtotal_str = f"${transfer_subtotal:,.2f}"
-            click.echo(f"{'Transfer Subtotal':<50} {transfer_subtotal_str:>20}")
-            click.echo("=" * 80)
-            click.echo()
-
-        # Display Expense categories
-        if expense_summaries:
-            click.echo("Expense")
-            click.echo("*" * 80)
-        expense_subtotal = 0.0
-        for s in expense_summaries:
-            total = s["expenses"] + s["income"]
-            expense_subtotal += total
-            category_name = s["category_name"] or "Uncategorized"
-            total_str = f"${total:,.2f}"
-            click.echo(f"    {category_name:<46} {total_str:>20}")
-
-        # Show Expense subtotal if there are expense categories
-        if expense_summaries:
-            click.echo("-" * 80)
-            expense_subtotal_str = f"${expense_subtotal:,.2f}"
-            click.echo(f"{'Expense Subtotal':<50} {expense_subtotal_str:>20}")
-            click.echo("=" * 80)
-        else:
-            # If no expense summaries, still need a separator before TOTAL
+        if not has_expense_section:
             click.echo("-" * 80)
 
     total_str = f"${overall_total:,.2f}" if overall_total != 0 else "-"
