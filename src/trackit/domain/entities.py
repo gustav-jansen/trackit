@@ -5,7 +5,7 @@ database schema. This allows the business logic to remain stable when the
 database schema changes (e.g., when switching to double-entry bookkeeping).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
@@ -97,6 +97,32 @@ class SummaryGroup:
 
 
 @dataclass(frozen=True)
+class SummaryRow:
+    """Ordered summary row for report rendering."""
+
+    category_id: Optional[int]
+    category_name: str
+    category_type: Optional[int]
+    total: float
+    income: float
+    expenses: float
+    count: int
+    period_totals: dict[str, float] = field(default_factory=dict)
+    children: tuple["SummaryRow", ...] = ()
+
+
+@dataclass(frozen=True)
+class SummarySection:
+    """Ordered summary section with subtotal totals."""
+
+    name: str
+    category_type: Optional[int]
+    rows: tuple[SummaryRow, ...]
+    subtotal: float
+    period_subtotals: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class SummaryReport:
     """Summary grouping report returned by domain services."""
 
@@ -113,6 +139,12 @@ class SummaryReport:
     descendant_map: dict[int, set[int]]
     category_summaries: tuple[dict, ...]
     groups: tuple[SummaryGroup, ...] = ()
+    sections: tuple[SummarySection, ...] = ()
+    period_sections: tuple[SummarySection, ...] = ()
+    expanded_sections: tuple[SummarySection, ...] = ()
+    period_expanded_sections: tuple[SummarySection, ...] = ()
+    overall_total: float = 0.0
+    period_overall_totals: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

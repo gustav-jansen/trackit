@@ -10,6 +10,8 @@ from trackit.domain.entities import (
     Transaction,
     CategoryTreeNode,
     SummaryCategoryFilter,
+    SummaryRow,
+    SummarySection,
 )
 
 
@@ -76,6 +78,12 @@ class SummaryService:
                 category_tree=(),
                 descendant_map={},
                 category_summaries=(),
+                sections=(),
+                period_sections=(),
+                expanded_sections=(),
+                period_expanded_sections=(),
+                overall_total=0.0,
+                period_overall_totals={},
             )
 
         transactions = self.get_filtered_transactions(
@@ -104,6 +112,36 @@ class SummaryService:
             }
             period_keys = tuple(sorted(period_transactions_map.keys()))
 
+        overall_total = sum(float(txn.amount) for txn in transactions)
+        period_overall_totals = self.calculate_period_overall_totals(
+            period_keys, period_transactions_map
+        )
+        sections = self.build_summary_sections(category_summaries, include_transfers)
+        period_sections = ()
+        period_expanded_sections = ()
+        if period_keys:
+            period_sections = self.build_period_summary_sections(
+                category_summaries=category_summaries,
+                period_keys=period_keys,
+                period_transactions_map=period_transactions_map,
+                descendant_map=descendant_map,
+                include_transfers=include_transfers,
+            )
+            period_expanded_sections = self.build_period_expanded_sections(
+                category_tree=category_tree,
+                transactions=transactions,
+                period_keys=period_keys,
+                period_transactions_map=period_transactions_map,
+                descendant_map=descendant_map,
+                include_transfers=include_transfers,
+            )
+        expanded_sections = self.build_expanded_sections(
+            category_tree=category_tree,
+            transactions=transactions,
+            descendant_map=descendant_map,
+            include_transfers=include_transfers,
+        )
+
         return SummaryReport(
             group_by=group_by,
             start_date=start_date,
@@ -117,6 +155,12 @@ class SummaryService:
             category_tree=tuple(category_tree),
             descendant_map=descendant_map,
             category_summaries=tuple(category_summaries),
+            sections=sections,
+            period_sections=period_sections,
+            expanded_sections=expanded_sections,
+            period_expanded_sections=period_expanded_sections,
+            overall_total=overall_total,
+            period_overall_totals=period_overall_totals,
         )
 
     def resolve_category_filter(
@@ -511,3 +555,463 @@ class SummaryService:
             for txn in period_transactions
             if txn.category_id in descendant_ids
         )
+
+    def calculate_period_overall_totals(
+        self,
+        period_keys: Sequence[str],
+        period_transactions_map: dict[str, tuple[Transaction, ...]],
+    ) -> dict[str, float]:
+        """Calculate overall totals per period key."""
+        return {
+            period_key: sum(
+                float(txn.amount) for txn in period_transactions_map.get(period_key, ())
+            )
+            for period_key in period_keys
+        }
+
+    def build_summary_sections(
+        self, category_summaries: Sequence[dict], include_transfers: bool
+    ) -> tuple[SummarySection, ...]:
+        """Build ordered summary sections for standard views."""
+        buckets: dict[str, list[SummaryRow]] = {
+            "income": [],
+            "transfer": [],
+            "expense": [],
+        }
+
+        for summary in category_summaries:
+            total = summary.get("expenses", 0.0) + summary.get("income", 0.0)
+            if total == 0:
+                continue
+
+            category_name = summary.get("category_name") or "Uncategorized"
+            category_type = summary.get("category_type")
+            row = SummaryRow(
+                category_id=summary.get("category_id"),
+                category_name=category_name,
+                category_type=category_type,
+                total=total,
+                income=summary.get("income", 0.0),
+                expenses=summary.get("expenses", 0.0),
+                count=summary.get("count", 0),
+            )
+            bucket = self.resolve_section_bucket(category_type, include_transfers)
+            buckets[bucket].append(row)
+
+        return self.finalize_sections(buckets)
+
+    def build_period_summary_sections(
+        self,
+        category_summaries: Sequence[dict],
+        period_keys: Sequence[str],
+        period_transactions_map: dict[str, tuple[Transaction, ...]],
+        descendant_map: dict[int, set[int]],
+        include_transfers: bool,
+    ) -> tuple[SummarySection, ...]:
+        """Build ordered summary sections for period grouping."""
+        buckets: dict[str, list[SummaryRow]] = {
+            "income": [],
+            "transfer": [],
+            "expense": [],
+        }
+
+        for summary in category_summaries:
+            category_id = summary.get("category_id")
+            period_totals = {
+                period_key: self.calculate_category_total_for_period(
+                    descendant_map,
+                    category_id,
+                    period_transactions_map.get(period_key, ()),
+                )
+                for period_key in period_keys
+            }
+            total = sum(period_totals.values())
+            if total == 0:
+                continue
+
+            category_name = summary.get("category_name") or "Uncategorized"
+            category_type = summary.get("category_type")
+            row = SummaryRow(
+                category_id=category_id,
+                category_name=category_name,
+                category_type=category_type,
+                total=total,
+                income=summary.get("income", 0.0),
+                expenses=summary.get("expenses", 0.0),
+                count=summary.get("count", 0),
+                period_totals=period_totals,
+            )
+            bucket = self.resolve_section_bucket(category_type, include_transfers)
+            buckets[bucket].append(row)
+
+        return self.finalize_sections(buckets, period_keys=period_keys)
+
+    def build_expanded_sections(
+        self,
+        category_tree: Sequence[CategoryTreeNode],
+        transactions: Sequence[Transaction],
+        descendant_map: dict[int, set[int]],
+        include_transfers: bool,
+    ) -> tuple[SummarySection, ...]:
+        """Build ordered summary sections for expanded views."""
+        buckets: dict[str, list[SummaryRow]] = {
+            "income": [],
+            "transfer": [],
+            "expense": [],
+        }
+
+        for node in category_tree or []:
+            resolved_type = self.resolve_category_type(node)
+            row = self.build_expanded_tree_row(
+                node=node,
+                transactions=transactions,
+                descendant_map=descendant_map,
+            )
+            if row is None:
+                continue
+            bucket = self.resolve_section_bucket(resolved_type, include_transfers)
+            buckets[bucket].append(row)
+
+        for bucket_rows in buckets.values():
+            bucket_rows.sort(key=lambda row: (-abs(row.total), row.category_name))
+
+        uncategorized_row = self.build_uncategorized_row(
+            transactions=transactions,
+            descendant_map=descendant_map,
+        )
+        return self.finalize_sections(
+            buckets, uncategorized_row=uncategorized_row, include_tree_order=True
+        )
+
+    def build_period_expanded_sections(
+        self,
+        category_tree: Sequence[CategoryTreeNode],
+        transactions: Sequence[Transaction],
+        period_keys: Sequence[str],
+        period_transactions_map: dict[str, tuple[Transaction, ...]],
+        descendant_map: dict[int, set[int]],
+        include_transfers: bool,
+    ) -> tuple[SummarySection, ...]:
+        """Build ordered summary sections for expanded period views."""
+        buckets: dict[str, list[SummaryRow]] = {
+            "income": [],
+            "transfer": [],
+            "expense": [],
+        }
+
+        for node in category_tree or []:
+            resolved_type = self.resolve_category_type(node)
+            row = self.build_period_expanded_tree_row(
+                node=node,
+                transactions=transactions,
+                period_keys=period_keys,
+                period_transactions_map=period_transactions_map,
+                descendant_map=descendant_map,
+            )
+            if row is None:
+                continue
+            bucket = self.resolve_section_bucket(resolved_type, include_transfers)
+            buckets[bucket].append(row)
+
+        for bucket_rows in buckets.values():
+            bucket_rows.sort(key=lambda row: (-abs(row.total), row.category_name))
+
+        uncategorized_row = self.build_period_uncategorized_row(
+            transactions=transactions,
+            period_keys=period_keys,
+            period_transactions_map=period_transactions_map,
+            descendant_map=descendant_map,
+        )
+        return self.finalize_sections(
+            buckets,
+            period_keys=period_keys,
+            uncategorized_row=uncategorized_row,
+            include_tree_order=True,
+            include_children_in_period_subtotals=True,
+        )
+
+    def resolve_section_bucket(
+        self, category_type: Optional[int], include_transfers: bool
+    ) -> str:
+        """Resolve section bucket for a category type."""
+        if category_type == 1:
+            return "income"
+        if category_type == 2 and include_transfers:
+            return "transfer"
+        return "expense"
+
+    def resolve_category_type(self, node: CategoryTreeNode) -> Optional[int]:
+        """Resolve category type for a tree node."""
+        if node.category_type is not None:
+            return node.category_type
+        if self.db is None:
+            return None
+        return self.get_category_type(node.id)
+
+    def calculate_category_stats(
+        self,
+        descendant_map: dict[int, set[int]],
+        category_id: Optional[int],
+        transactions: Sequence[Transaction],
+    ) -> tuple[float, float, int, float]:
+        """Calculate income, expenses, count, and total for a category."""
+        if category_id is None:
+            matching = [txn for txn in transactions if txn.category_id is None]
+        else:
+            descendant_ids = descendant_map.get(category_id, {category_id})
+            matching = [
+                txn for txn in transactions if txn.category_id in descendant_ids
+            ]
+
+        income = sum(float(txn.amount) for txn in matching if txn.amount > 0)
+        expenses = sum(float(txn.amount) for txn in matching if txn.amount < 0)
+        count = len(matching)
+        total = income + expenses
+        return income, expenses, count, total
+
+    def build_expanded_tree_row(
+        self,
+        node: CategoryTreeNode,
+        transactions: Sequence[Transaction],
+        descendant_map: dict[int, set[int]],
+    ) -> Optional[SummaryRow]:
+        """Build a summary row for expanded trees."""
+        income, expenses, count, total = self.calculate_category_stats(
+            descendant_map, node.id, transactions
+        )
+        if total == 0:
+            return None
+
+        children = self.build_expanded_tree_rows(
+            nodes=node.children,
+            transactions=transactions,
+            descendant_map=descendant_map,
+        )
+        category_type = self.resolve_category_type(node)
+        return SummaryRow(
+            category_id=node.id,
+            category_name=node.name,
+            category_type=category_type,
+            total=total,
+            income=income,
+            expenses=expenses,
+            count=count,
+            children=children,
+        )
+
+    def build_expanded_tree_rows(
+        self,
+        nodes: Sequence[CategoryTreeNode],
+        transactions: Sequence[Transaction],
+        descendant_map: dict[int, set[int]],
+    ) -> tuple[SummaryRow, ...]:
+        """Build ordered tree rows for expanded views."""
+        rows: list[SummaryRow] = []
+        for node in nodes or []:
+            row = self.build_expanded_tree_row(
+                node=node,
+                transactions=transactions,
+                descendant_map=descendant_map,
+            )
+            if row is not None:
+                rows.append(row)
+
+        rows.sort(key=lambda row: (-abs(row.total), row.category_name))
+        return tuple(rows)
+
+    def build_period_expanded_tree_row(
+        self,
+        node: CategoryTreeNode,
+        transactions: Sequence[Transaction],
+        period_keys: Sequence[str],
+        period_transactions_map: dict[str, tuple[Transaction, ...]],
+        descendant_map: dict[int, set[int]],
+    ) -> Optional[SummaryRow]:
+        """Build a summary row for expanded period trees."""
+        period_totals = {
+            period_key: self.calculate_category_total_for_period(
+                descendant_map,
+                node.id,
+                period_transactions_map.get(period_key, ()),
+            )
+            for period_key in period_keys
+        }
+        total = sum(period_totals.values())
+        if total == 0:
+            return None
+
+        income, expenses, count, _ = self.calculate_category_stats(
+            descendant_map, node.id, transactions
+        )
+        children = self.build_period_expanded_tree_rows(
+            nodes=node.children,
+            transactions=transactions,
+            period_keys=period_keys,
+            period_transactions_map=period_transactions_map,
+            descendant_map=descendant_map,
+        )
+        category_type = self.resolve_category_type(node)
+        return SummaryRow(
+            category_id=node.id,
+            category_name=node.name,
+            category_type=category_type,
+            total=total,
+            income=income,
+            expenses=expenses,
+            count=count,
+            period_totals=period_totals,
+            children=children,
+        )
+
+    def build_period_expanded_tree_rows(
+        self,
+        nodes: Sequence[CategoryTreeNode],
+        transactions: Sequence[Transaction],
+        period_keys: Sequence[str],
+        period_transactions_map: dict[str, tuple[Transaction, ...]],
+        descendant_map: dict[int, set[int]],
+    ) -> tuple[SummaryRow, ...]:
+        """Build ordered tree rows for expanded period views."""
+        rows: list[SummaryRow] = []
+        for node in nodes or []:
+            row = self.build_period_expanded_tree_row(
+                node=node,
+                transactions=transactions,
+                period_keys=period_keys,
+                period_transactions_map=period_transactions_map,
+                descendant_map=descendant_map,
+            )
+            if row is not None:
+                rows.append(row)
+
+        rows.sort(key=lambda row: (-abs(row.total), row.category_name))
+        return tuple(rows)
+
+    def build_uncategorized_row(
+        self,
+        transactions: Sequence[Transaction],
+        descendant_map: dict[int, set[int]],
+    ) -> Optional[SummaryRow]:
+        """Build uncategorized row for expanded summary views."""
+        income, expenses, count, total = self.calculate_category_stats(
+            descendant_map, None, transactions
+        )
+        if total == 0:
+            return None
+
+        return SummaryRow(
+            category_id=None,
+            category_name="Uncategorized",
+            category_type=None,
+            total=total,
+            income=income,
+            expenses=expenses,
+            count=count,
+        )
+
+    def build_period_uncategorized_row(
+        self,
+        transactions: Sequence[Transaction],
+        period_keys: Sequence[str],
+        period_transactions_map: dict[str, tuple[Transaction, ...]],
+        descendant_map: dict[int, set[int]],
+    ) -> Optional[SummaryRow]:
+        """Build uncategorized row for expanded period summary views."""
+        period_totals = {
+            period_key: self.calculate_category_total_for_period(
+                descendant_map,
+                None,
+                period_transactions_map.get(period_key, ()),
+            )
+            for period_key in period_keys
+        }
+        total = sum(period_totals.values())
+        if total == 0:
+            return None
+
+        income, expenses, count, _ = self.calculate_category_stats(
+            descendant_map, None, transactions
+        )
+        return SummaryRow(
+            category_id=None,
+            category_name="Uncategorized",
+            category_type=None,
+            total=total,
+            income=income,
+            expenses=expenses,
+            count=count,
+            period_totals=period_totals,
+        )
+
+    def finalize_sections(
+        self,
+        buckets: dict[str, list[SummaryRow]],
+        period_keys: Optional[Sequence[str]] = None,
+        uncategorized_row: Optional[SummaryRow] = None,
+        include_tree_order: bool = False,
+        include_children_in_period_subtotals: bool = False,
+    ) -> tuple[SummarySection, ...]:
+        """Finalize section ordering and subtotals."""
+        period_keys = tuple(period_keys or ())
+        section_definitions = (
+            ("Income", "income", 1),
+            ("Transfer", "transfer", 2),
+            ("Expense", "expense", 0),
+        )
+
+        sections: list[SummarySection] = []
+        for name, bucket, category_type in section_definitions:
+            rows = list(buckets.get(bucket, []))
+            if not include_tree_order:
+                rows.sort(key=lambda row: (-abs(row.total), row.category_name))
+
+            if bucket == "expense" and uncategorized_row is not None:
+                rows.append(uncategorized_row)
+
+            if not rows:
+                continue
+
+            period_subtotals: dict[str, float] = {}
+            if period_keys:
+                if include_children_in_period_subtotals:
+                    period_subtotals = self.sum_period_totals_from_rows(
+                        rows, period_keys
+                    )
+                else:
+                    period_subtotals = {
+                        period_key: sum(
+                            row.period_totals.get(period_key, 0.0) for row in rows
+                        )
+                        for period_key in period_keys
+                    }
+
+            subtotal = sum(row.total for row in rows)
+            sections.append(
+                SummarySection(
+                    name=name,
+                    category_type=category_type,
+                    rows=tuple(rows),
+                    subtotal=subtotal,
+                    period_subtotals=period_subtotals,
+                )
+            )
+
+        return tuple(sections)
+
+    def sum_period_totals_from_rows(
+        self, rows: Sequence[SummaryRow], period_keys: Sequence[str]
+    ) -> dict[str, float]:
+        """Sum period totals for rows, including nested children."""
+        totals: dict[str, float] = {period_key: 0.0 for period_key in period_keys}
+
+        for row in rows:
+            for period_key in period_keys:
+                totals[period_key] += row.period_totals.get(period_key, 0.0)
+            if row.children:
+                child_totals = self.sum_period_totals_from_rows(
+                    row.children, period_keys
+                )
+                for period_key in period_keys:
+                    totals[period_key] += child_totals.get(period_key, 0.0)
+
+        return totals

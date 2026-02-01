@@ -34,6 +34,13 @@ def _find_summary_by_name(summaries, name):
     return None
 
 
+def _find_section_by_name(sections, name):
+    for section in sections:
+        if section.name == name:
+            return section
+    return None
+
+
 def test_build_descendant_map_includes_children(temp_db, sample_categories):
     summary_service = SummaryService(temp_db)
     category_tree = summary_service.get_category_tree(None)
@@ -642,3 +649,135 @@ def test_build_category_summary_splits_income_and_expenses(
     assert food_summary["expenses"] == pytest.approx(-50.0)
     assert food_summary["income"] == pytest.approx(25.0)
     assert food_summary["count"] == 2
+
+
+def test_build_summary_report_sections_order_and_subtotals(
+    temp_db,
+    sample_account,
+    sample_categories,
+    transaction_service,
+    category_service,
+):
+    summary_service = SummaryService(temp_db)
+
+    income_id = category_service.create_category(
+        name="Income", parent_path=None, category_type=1
+    )
+
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 10),
+        amount=Decimal("100.00"),
+        description="Paycheck",
+        category_id=income_id,
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 11),
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining"],
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN003",
+        account_id=sample_account.id,
+        date=date(2024, 1, 12),
+        amount=Decimal("20.00"),
+        description="Adjustment",
+        category_id=None,
+    )
+
+    report = summary_service.build_summary_report(group_by=SummaryGroupBy.CATEGORY)
+
+    income_section = _find_section_by_name(report.sections, "Income")
+    expense_section = _find_section_by_name(report.sections, "Expense")
+
+    assert income_section is not None
+    assert expense_section is not None
+    assert [row.category_name for row in expense_section.rows] == [
+        "Food & Dining",
+        "Uncategorized",
+    ]
+    assert income_section.subtotal == pytest.approx(100.0)
+    assert expense_section.subtotal == pytest.approx(-30.0)
+    assert report.overall_total == pytest.approx(70.0)
+
+
+def test_build_summary_report_period_sections_include_period_totals(
+    temp_db, sample_account, sample_categories, transaction_service
+):
+    summary_service = SummaryService(temp_db)
+
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 10),
+        amount=Decimal("-10.00"),
+        description="January",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 3, 5),
+        amount=Decimal("-20.00"),
+        description="March",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+
+    report = summary_service.build_summary_report(
+        group_by=SummaryGroupBy.CATEGORY_MONTH
+    )
+
+    expense_section = _find_section_by_name(report.period_sections, "Expense")
+
+    assert expense_section is not None
+    assert len(expense_section.rows) == 1
+    row = expense_section.rows[0]
+    assert row.category_name == "Food & Dining"
+    assert row.period_totals["2024-01"] == pytest.approx(-10.0)
+    assert row.period_totals["2024-03"] == pytest.approx(-20.0)
+    assert report.period_overall_totals["2024-01"] == pytest.approx(-10.0)
+
+
+def test_build_summary_report_expanded_sections_order_and_uncategorized(
+    temp_db, sample_account, sample_categories, transaction_service
+):
+    summary_service = SummaryService(temp_db)
+
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 10),
+        amount=Decimal("-50.00"),
+        description="Groceries",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 12),
+        amount=Decimal("-20.00"),
+        description="Gas",
+        category_id=sample_categories["Transportation > Gas"],
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN003",
+        account_id=sample_account.id,
+        date=date(2024, 1, 13),
+        amount=Decimal("10.00"),
+        description="Adjustment",
+        category_id=None,
+    )
+
+    report = summary_service.build_summary_report(group_by=SummaryGroupBy.CATEGORY)
+
+    expense_section = _find_section_by_name(report.expanded_sections, "Expense")
+
+    assert expense_section is not None
+    row_names = [row.category_name for row in expense_section.rows]
+    assert row_names[0] == "Food & Dining"
+    assert row_names[1] == "Transportation"
+    assert row_names[-1] == "Uncategorized"
