@@ -269,9 +269,23 @@ def test_build_summary_report_nonexistent_category_path(temp_db):
 
     report = summary_service.build_summary_report(category_path="Not A Category")
 
+    assert report.category_filter.is_missing is True
+    assert report.category_filter.requested_path == "Not A Category"
+    assert report.category_filter.resolved_path is None
     assert report.transactions == ()
     assert report.category_tree == ()
     assert report.category_summaries == ()
+
+
+def test_build_summary_report_resolves_category_filter(temp_db, sample_categories):
+    summary_service = SummaryService(temp_db)
+
+    report = summary_service.build_summary_report(category_path="Food & Dining")
+
+    assert report.category_filter.is_missing is False
+    assert report.category_filter.requested_path == "Food & Dining"
+    assert report.category_filter.resolved_path == "Food & Dining"
+    assert report.category_filter.category_id == sample_categories["Food & Dining"]
 
 
 def test_build_summary_report_transfer_filter_respects_include_transfers(
@@ -553,6 +567,46 @@ def test_get_filtered_transactions_category_filter_does_not_include_transfers(
     assert all(
         txn.category_id != transfer_sub_id for txn in transactions_with_transfers
     )
+
+
+def test_get_filtered_transactions_includes_descendants(
+    temp_db, sample_account, sample_categories, transaction_service
+):
+    summary_service = SummaryService(temp_db)
+
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 15),
+        amount=Decimal("-40.00"),
+        description="Parent",
+        category_id=sample_categories["Food & Dining"],
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 1, 16),
+        amount=Decimal("-15.00"),
+        description="Child",
+        category_id=sample_categories["Food & Dining > Groceries"],
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN003",
+        account_id=sample_account.id,
+        date=date(2024, 1, 17),
+        amount=Decimal("-10.00"),
+        description="Other",
+        category_id=sample_categories["Transportation > Gas"],
+    )
+
+    transactions = summary_service.get_filtered_transactions(
+        category_path="Food & Dining"
+    )
+    category_ids = {txn.category_id for txn in transactions}
+
+    assert sample_categories["Food & Dining"] in category_ids
+    assert sample_categories["Food & Dining > Groceries"] in category_ids
+    assert sample_categories["Transportation > Gas"] not in category_ids
 
 
 def test_build_category_summary_splits_income_and_expenses(
