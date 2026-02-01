@@ -72,9 +72,10 @@ def add_transaction(
     # Get category ID if provided
     category_id = None
     if category:
-        category_obj = category_service.get_category_by_path(category)
-        if category_obj is None:
-            click.echo(f"Error: Category '{category}' not found", err=True)
+        try:
+            category_obj = category_service.require_category_by_path(category)
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
             ctx.exit(1)
         category_id = category_obj.id
 
@@ -84,14 +85,6 @@ def add_transaction(
         import time
 
         unique_id = f"manual_{account_id}_{int(time.time() * 1000000)}"
-
-    # Check if transaction with this unique_id already exists
-    if db.transaction_exists(account_id, unique_id):
-        click.echo(
-            f"Error: Transaction with unique_id '{unique_id}' already exists for this account",
-            err=True,
-        )
-        ctx.exit(1)
 
     # Create transaction
     try:

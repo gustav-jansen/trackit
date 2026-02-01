@@ -119,8 +119,7 @@ def delete_account(ctx, account: str) -> None:
         ctx.exit(1)
 
     # Check for dependencies
-    transaction_count = db.get_account_transaction_count(account_id)
-    format_count = db.get_account_format_count(account_id)
+    transaction_count, format_count = service.get_delete_blockers(account_id)
 
     if transaction_count > 0 or format_count > 0:
         parts = []

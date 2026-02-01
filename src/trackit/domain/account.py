@@ -109,3 +109,16 @@ class AccountService:
             )
 
         self.db.delete_account(account_id)
+
+    def get_delete_blockers(self, account_id: int) -> tuple[int, int]:
+        """Return counts of dependent transactions and formats.
+
+        Args:
+            account_id: Account ID
+
+        Returns:
+            Tuple of (transaction_count, format_count)
+        """
+        transaction_count = self.db.get_account_transaction_count(account_id)
+        format_count = self.db.get_account_format_count(account_id)
+        return transaction_count, format_count
