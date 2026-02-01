@@ -34,6 +34,18 @@ class Category:
 
 
 @dataclass(frozen=True)
+class CategoryTreeNode:
+    """Category tree node domain entity.
+
+    Represents the minimal category tree shape (name + children) used for
+    hierarchical displays while keeping the structure explicit and typed.
+    """
+
+    name: str
+    children: tuple["CategoryTreeNode", ...] = ()
+
+
+@dataclass(frozen=True)
 class Transaction:
     """Transaction domain entity."""
 
