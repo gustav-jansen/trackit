@@ -781,3 +781,49 @@ def test_build_summary_report_expanded_sections_order_and_uncategorized(
     assert row_names[0] == "Food & Dining"
     assert row_names[1] == "Transportation"
     assert row_names[-1] == "Uncategorized"
+
+
+def test_build_summary_report_period_expanded_sections_uncategorized_last(
+    temp_db, sample_account, transaction_service, category_service
+):
+    summary_service = SummaryService(temp_db)
+
+    misc_id = category_service.create_category(name="Misc", parent_path=None)
+
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=date(2024, 1, 10),
+        amount=Decimal("-10.00"),
+        description="Misc January",
+        category_id=misc_id,
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN002",
+        account_id=sample_account.id,
+        date=date(2024, 2, 10),
+        amount=Decimal("-20.00"),
+        description="Misc February",
+        category_id=misc_id,
+    )
+    transaction_service.create_transaction(
+        unique_id="TXN003",
+        account_id=sample_account.id,
+        date=date(2024, 1, 12),
+        amount=Decimal("5.00"),
+        description="Uncategorized",
+        category_id=None,
+    )
+
+    report = summary_service.build_summary_report(
+        group_by=SummaryGroupBy.CATEGORY_MONTH
+    )
+
+    expense_section = _find_section_by_name(report.period_expanded_sections, "Expense")
+    assert expense_section is not None
+    assert expense_section.rows[-1].category_name == "Uncategorized"
+
+    misc_row = next(row for row in expense_section.rows if row.category_name == "Misc")
+    assert misc_row.period_totals["2024-01"] == pytest.approx(-10.0)
+    assert misc_row.period_totals["2024-02"] == pytest.approx(-20.0)
+    assert expense_section.period_subtotals["2024-01"] == pytest.approx(-5.0)
