@@ -5,6 +5,12 @@ from datetime import date
 from decimal import Decimal
 from trackit.database.base import Database
 from trackit.domain.entities import Transaction as TransactionEntity
+from trackit.domain.errors import (
+    account_not_found,
+    category_not_found,
+    category_path_not_found,
+    duplicate_transaction_unique_id,
+)
 
 
 class TransactionService:
@@ -50,19 +56,17 @@ class TransactionService:
         # Verify account exists
         account = self.db.get_account(account_id)
         if account is None:
-            raise ValueError(f"Account {account_id} not found")
+            raise ValueError(account_not_found(account_id))
 
         # Check for duplicate
         if self.db.transaction_exists(account_id, unique_id):
-            raise ValueError(
-                f"Transaction with unique_id '{unique_id}' already exists for account {account_id}"
-            )
+            raise ValueError(duplicate_transaction_unique_id(unique_id, account_id))
 
         # Verify category if provided
         if category_id is not None:
             category = self.db.get_category(category_id)
             if category is None:
-                raise ValueError(f"Category {category_id} not found")
+                raise ValueError(category_not_found(category_id))
 
         return self.db.create_transaction(
             unique_id=unique_id,
@@ -107,7 +111,7 @@ class TransactionService:
         if category_path is not None:
             category = self.db.get_category_by_path(category_path)
             if category is None:
-                raise ValueError(f"Category '{category_path}' not found")
+                raise ValueError(category_path_not_found(category_path))
             category_id = category.id
 
         self.db.update_transaction_category(transaction_id, category_id)
@@ -166,7 +170,7 @@ class TransactionService:
         if account_id is not None:
             account = self.db.get_account(account_id)
             if account is None:
-                raise ValueError(f"Account {account_id} not found")
+                raise ValueError(account_not_found(account_id))
 
         # Handle category update or clear
         if clear_category:
@@ -178,7 +182,7 @@ class TransactionService:
             # Verify category exists
             category = self.db.get_category(category_id)
             if category is None:
-                raise ValueError(f"Category {category_id} not found")
+                raise ValueError(category_not_found(category_id))
             category_id_to_update = category_id
             update_category_flag = False
         else:

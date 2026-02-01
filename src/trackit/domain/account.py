@@ -3,6 +3,7 @@
 from typing import Optional
 from trackit.database.base import Database
 from trackit.domain.entities import Account as AccountEntity
+from trackit.domain.errors import account_delete_blocked, account_not_found
 
 
 class AccountService:
@@ -56,7 +57,9 @@ class AccountService:
         """
         return self.db.list_accounts()
 
-    def rename_account(self, account_id: int, name: str, bank_name: Optional[str] = None) -> None:
+    def rename_account(
+        self, account_id: int, name: str, bank_name: Optional[str] = None
+    ) -> None:
         """Rename an account.
 
         Args:
@@ -70,7 +73,7 @@ class AccountService:
         # Validate account exists
         account = self.db.get_account(account_id)
         if account is None:
-            raise ValueError(f"Account {account_id} not found")
+            raise ValueError(account_not_found(account_id))
 
         # Check for duplicate names (excluding current account)
         accounts = self.db.list_accounts()
@@ -78,7 +81,9 @@ class AccountService:
             if acc.id != account_id and acc.name == name:
                 raise ValueError(f"Account with name '{name}' already exists")
 
-        self.db.update_account_name(account_id=account_id, name=name, bank_name=bank_name)
+        self.db.update_account_name(
+            account_id=account_id, name=name, bank_name=bank_name
+        )
 
     def delete_account(self, account_id: int) -> None:
         """Delete an account.
@@ -92,22 +97,15 @@ class AccountService:
         # Validate account exists
         account = self.db.get_account(account_id)
         if account is None:
-            raise ValueError(f"Account {account_id} not found")
+            raise ValueError(account_not_found(account_id))
 
         # Check for associated transactions and formats
         transaction_count = self.db.get_account_transaction_count(account_id)
         format_count = self.db.get_account_format_count(account_id)
 
         if transaction_count > 0 or format_count > 0:
-            parts = []
-            if transaction_count > 0:
-                parts.append(f"{transaction_count} transaction{'s' if transaction_count != 1 else ''}")
-            if format_count > 0:
-                parts.append(f"{format_count} CSV format{'s' if format_count != 1 else ''}")
             raise ValueError(
-                f"Cannot delete account {account_id}: it has {', '.join(parts)}. "
-                f"Please reassign or delete them first."
+                account_delete_blocked(account_id, transaction_count, format_count)
             )
 
         self.db.delete_account(account_id)
-

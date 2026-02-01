@@ -3,6 +3,7 @@
 from typing import Optional, Any
 from trackit.database.base import Database
 from trackit.domain.entities import Category as CategoryEntity
+from trackit.domain.errors import category_path_not_found
 
 
 class CategoryService:
@@ -39,7 +40,7 @@ class CategoryService:
         if parent_path is not None:
             parent = self.db.get_category_by_path(parent_path)
             if parent is None:
-                raise ValueError(f"Parent category '{parent_path}' not found")
+                raise ValueError(category_path_not_found(parent_path))
             parent_id = parent.id
 
         return self.db.create_category(
@@ -67,6 +68,23 @@ class CategoryService:
             Category entity or None if not found
         """
         return self.db.get_category_by_path(path)
+
+    def require_category_by_path(self, path: str) -> CategoryEntity:
+        """Get category by path or raise if missing.
+
+        Args:
+            path: Category path (e.g., "Food & Dining > Groceries")
+
+        Returns:
+            Category entity
+
+        Raises:
+            ValueError: If category does not exist
+        """
+        category = self.db.get_category_by_path(path)
+        if category is None:
+            raise ValueError(category_path_not_found(path))
+        return category
 
     def list_categories(self, parent_id: Optional[int] = None) -> list[CategoryEntity]:
         """List categories.
