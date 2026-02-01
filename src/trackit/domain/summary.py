@@ -1,7 +1,7 @@
 """Summary grouping domain service."""
 
 from datetime import date
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Any
 
 from trackit.database.base import Database
 from trackit.domain.entities import SummaryGroupBy, SummaryReport, Transaction
@@ -95,6 +95,33 @@ class SummaryService:
             category_summaries=tuple(category_summaries),
         )
 
+    def build_category_summary(
+        self,
+        transactions: Sequence[Transaction],
+        category_tree: list[dict],
+        category_id: Optional[int],
+    ) -> list[dict[str, Any]]:
+        """Build category summary from transactions and category tree."""
+        category_index, parent_map, children_map = self.build_category_index(
+            category_tree
+        )
+        immediate_children_ids = None
+        if category_id is not None:
+            immediate_children_ids = set(children_map.get(category_id, set()))
+
+        summary_dict = self.aggregate_transactions_by_group(
+            transactions,
+            category_id=category_id,
+            category_index=category_index,
+            parent_map=parent_map,
+            immediate_children_ids=immediate_children_ids,
+        )
+        return self.convert_summary_to_results(
+            summary_dict=summary_dict,
+            category_id=category_id,
+            category_index=category_index,
+        )
+
     def get_filtered_transactions(
         self,
         start_date: Optional[date] = None,
@@ -160,6 +187,36 @@ class SummaryService:
         subtree = find_subtree(full_tree, category.id)
         return [subtree] if subtree is not None else []
 
+    def build_category_index(
+        self, category_tree: list[dict]
+    ) -> tuple[
+        dict[int, dict[str, Any]], dict[int, Optional[int]], dict[int, set[int]]
+    ]:
+        """Build lookup maps from a category tree."""
+        category_index: dict[int, dict[str, Any]] = {}
+        parent_map: dict[int, Optional[int]] = {}
+        children_map: dict[int, set[int]] = {}
+
+        def visit(node: dict) -> None:
+            category_id = node.get("id")
+            if category_id is None:
+                return
+            category_index[category_id] = {
+                "name": node.get("name"),
+                "category_type": node.get("category_type"),
+            }
+            parent_map[category_id] = node.get("parent_id")
+            for child in node.get("children", []):
+                child_id = child.get("id")
+                if child_id is not None:
+                    children_map.setdefault(category_id, set()).add(child_id)
+                visit(child)
+
+        for root in category_tree or []:
+            visit(root)
+
+        return category_index, parent_map, children_map
+
     def build_descendant_map(self, category_tree: list[dict]) -> dict[int, set[int]]:
         """Build map of category IDs to descendant ID sets."""
         descendant_map: dict[int, set[int]] = {}
@@ -175,6 +232,127 @@ class SummaryService:
             collect_descendants(root)
 
         return descendant_map
+
+    def get_top_level_category_id(
+        self,
+        category_id: int,
+        category_index: dict[int, dict[str, Any]],
+        parent_map: dict[int, Optional[int]],
+    ) -> Optional[int]:
+        """Get top-level category ID for a category in a tree."""
+        if category_id not in category_index:
+            return None
+
+        current_id = category_id
+        while True:
+            parent_id = parent_map.get(current_id)
+            if parent_id is None:
+                return current_id
+            current_id = parent_id
+
+    def get_group_id_for_transaction(
+        self,
+        txn: Transaction,
+        category_id: Optional[int],
+        category_index: dict[int, dict[str, Any]],
+        parent_map: dict[int, Optional[int]],
+        immediate_children_ids: Optional[set[int]],
+    ) -> Optional[int]:
+        """Determine summary group ID for a transaction."""
+        if txn.category_id is None:
+            return None
+
+        if category_id is None:
+            return self.get_top_level_category_id(
+                txn.category_id, category_index, parent_map
+            )
+
+        if txn.category_id == category_id:
+            return category_id
+
+        if immediate_children_ids and txn.category_id in immediate_children_ids:
+            return txn.category_id
+
+        current_id = txn.category_id
+        while current_id is not None and current_id != category_id:
+            parent_id = parent_map.get(current_id)
+            if parent_id == category_id:
+                return current_id
+            if current_id not in category_index:
+                break
+            current_id = parent_id
+
+        return category_id
+
+    def aggregate_transactions_by_group(
+        self,
+        transactions: Sequence[Transaction],
+        category_id: Optional[int],
+        category_index: dict[int, dict[str, Any]],
+        parent_map: dict[int, Optional[int]],
+        immediate_children_ids: Optional[set[int]],
+    ) -> dict[Optional[int], dict[str, Any]]:
+        """Aggregate transactions into summary groups."""
+        from collections import defaultdict
+
+        summary_dict: dict[Optional[int], dict[str, Any]] = defaultdict(
+            lambda: {"expenses": 0.0, "income": 0.0, "count": 0}
+        )
+
+        for txn in transactions:
+            group_id = self.get_group_id_for_transaction(
+                txn,
+                category_id=category_id,
+                category_index=category_index,
+                parent_map=parent_map,
+                immediate_children_ids=immediate_children_ids,
+            )
+            summary_dict[group_id]["expenses"] += float(min(txn.amount, 0))
+            summary_dict[group_id]["income"] += float(max(txn.amount, 0))
+            summary_dict[group_id]["count"] += 1
+
+        return summary_dict
+
+    def convert_summary_to_results(
+        self,
+        summary_dict: dict[Optional[int], dict[str, Any]],
+        category_id: Optional[int],
+        category_index: dict[int, dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Convert summary groups into result dictionaries."""
+        parent_name = None
+        if category_id is not None:
+            parent_name = category_index.get(category_id, {}).get("name")
+
+        results: list[dict[str, Any]] = []
+        for group_id, data in summary_dict.items():
+            if group_id is None:
+                category_name = "Uncategorized"
+            elif category_id is not None and group_id == category_id:
+                category_name = parent_name or "Unknown"
+            else:
+                category_name = category_index.get(group_id, {}).get("name")
+                if category_name is None:
+                    category_name = (
+                        "Uncategorized" if category_id is None else "Unknown"
+                    )
+
+            category_type = None
+            if group_id is not None:
+                category_type = category_index.get(group_id, {}).get("category_type")
+
+            results.append(
+                {
+                    "category_id": group_id,
+                    "category_name": category_name,
+                    "category_type": category_type,
+                    "expenses": data["expenses"],
+                    "income": data["income"],
+                    "count": data["count"],
+                }
+            )
+
+        return results
 
     def get_category_type(self, category_id: Optional[int]) -> Optional[int]:
         """Get category type for a category ID."""
