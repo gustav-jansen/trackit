@@ -331,19 +331,3 @@ class Database(ABC):
             uncategorized: If True, only return transactions without a category
         """
         pass
-
-    @abstractmethod
-    def get_summary_transactions(
-        self,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        category_id: Optional[int] = None,
-        include_transfers: bool = False,
-    ) -> list[Transaction]:
-        """Get transactions for summary views.
-
-        This returns raw transactions filtered only by date and exact category_id.
-        Summary-specific filtering (descendants, transfer exclusion) is handled
-        in the domain layer.
-        """
-        pass
