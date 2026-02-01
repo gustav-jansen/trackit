@@ -4,7 +4,6 @@ import click
 from trackit.cli.date_filters import resolve_cli_date_range
 from trackit.domain.summary import SummaryService
 from trackit.domain.entities import SummaryGroupBy
-from trackit.domain.transaction import TransactionService
 from trackit.utils.date_parser import get_last_six_months_range
 
 
@@ -621,7 +620,6 @@ def summary(
 ):
     """Show category summary."""
     db = ctx.obj["db"]
-    service = TransactionService(db)
     summary_service = SummaryService(db)
 
     # Validate grouping options
@@ -846,12 +844,7 @@ def summary(
             click.echo("=" * 80)
     else:
         # Standard view: show top-level categories (or subcategories if category filter is specified)
-        summaries = service.get_summary(
-            start_date=start,
-            end_date=end,
-            category_path=category,
-            include_transfers=include_transfers,
-        )
+        summaries = list(report.category_summaries)
 
         if not summaries:
             click.echo("No transactions found.")
