@@ -950,6 +950,87 @@ def test_summary_groups_by_type_with_subtotals(
     assert "-50.00" in result.output
 
 
+def test_summary_uncategorized_only_standard(
+    cli_runner, temp_db, sample_account, transaction_service
+):
+    """Test summary with only uncategorized transactions (standard view)."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.00"),
+        description="Uncategorized",
+        category_id=None,
+    )
+
+    result = cli_runner.invoke(cli, ["--db-path", temp_db.database_path, "summary"])
+
+    assert result.exit_code == 0
+    assert "Category Summary" in result.output
+    assert "Uncategorized" in result.output
+    assert "-25.00" in result.output
+
+
+def test_summary_uncategorized_only_expanded(
+    cli_runner, temp_db, sample_account, transaction_service
+):
+    """Test summary with only uncategorized transactions (expanded view)."""
+    from datetime import date
+    from decimal import Decimal
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-25.00"),
+        description="Uncategorized",
+        category_id=None,
+    )
+
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "summary", "--expand"]
+    )
+
+    assert result.exit_code == 0
+    assert "Category Summary (Expanded)" in result.output
+    assert "Uncategorized" in result.output
+    assert "-25.00" in result.output
+
+
+def test_summary_unicode_category_name(
+    cli_runner, temp_db, sample_account, transaction_service, category_service
+):
+    """Test summary output with non-ASCII category names."""
+    from datetime import date
+    from decimal import Decimal
+
+    category_name = "\u00c9picerie"
+    category_id = category_service.create_category(
+        name=category_name, parent_path=None, category_type=0
+    )
+
+    today = date.today()
+    transaction_service.create_transaction(
+        unique_id="TXN001",
+        account_id=sample_account.id,
+        date=today,
+        amount=Decimal("-12.00"),
+        description="Groceries",
+        category_id=category_id,
+    )
+
+    result = cli_runner.invoke(cli, ["--db-path", temp_db.database_path, "summary"])
+
+    assert result.exit_code == 0
+    assert category_name in result.output
+    assert "-12.00" in result.output
+
+
 def test_summary_this_month(
     cli_runner, temp_db, sample_account, sample_categories, transaction_service
 ):

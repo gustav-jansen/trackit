@@ -1,4 +1,4 @@
 .PHONY: test
 
 test:
-	uv run pytest tests/
+	uv run --extra test pytest tests/
