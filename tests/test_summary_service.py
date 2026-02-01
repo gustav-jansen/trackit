@@ -11,9 +11,9 @@ from trackit.domain.entities import SummaryGroupBy, Transaction
 
 def _find_node_by_name(nodes, name):
     for node in nodes:
-        if node.get("name") == name:
+        if node.name == name:
             return node
-        child_match = _find_node_by_name(node.get("children", []), name)
+        child_match = _find_node_by_name(node.children, name)
         if child_match is not None:
             return child_match
     return None
@@ -22,8 +22,8 @@ def _find_node_by_name(nodes, name):
 def _flatten_names(nodes):
     names = []
     for node in nodes:
-        names.append(node.get("name"))
-        names.extend(_flatten_names(node.get("children", [])))
+        names.append(node.name)
+        names.extend(_flatten_names(node.children))
     return names
 
 
@@ -44,8 +44,8 @@ def test_build_descendant_map_includes_children(temp_db, sample_categories):
 
     assert parent_node is not None
     assert child_node is not None
-    parent_id = parent_node["id"]
-    child_id = child_node["id"]
+    parent_id = parent_node.id
+    child_id = child_node.id
 
     assert parent_id in descendant_map
     assert parent_id in descendant_map[parent_id]
@@ -57,7 +57,7 @@ def test_get_category_tree_with_filter(temp_db, sample_categories):
 
     category_tree = summary_service.get_category_tree("Food & Dining")
     assert len(category_tree) == 1
-    assert category_tree[0].get("name") == "Food & Dining"
+    assert category_tree[0].name == "Food & Dining"
 
     names = _flatten_names(category_tree)
     assert "Transportation" not in names

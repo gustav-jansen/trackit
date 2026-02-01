@@ -1,8 +1,8 @@
 """Category domain service."""
 
-from typing import Optional, Any
+from typing import Optional
 from trackit.database.base import Database
-from trackit.domain.entities import Category as CategoryEntity
+from trackit.domain.entities import Category as CategoryEntity, CategoryTreeNode
 from trackit.domain.errors import category_path_not_found
 
 
@@ -97,17 +97,17 @@ class CategoryService:
         """
         return self.db.list_categories(parent_id=parent_id)
 
-    def get_category_tree(self) -> list[dict]:
+    def get_category_tree(self) -> list[CategoryTreeNode]:
         """Get full category tree.
 
         Returns:
-            List of root categories with nested children (as dicts for hierarchical structure)
+            List of root categories with nested children
         """
         return self.db.get_category_tree()
 
     def get_category_subtree_by_path(
         self, category_path: Optional[str]
-    ) -> list[dict[str, Any]]:
+    ) -> list[CategoryTreeNode]:
         """Get a category subtree by path.
 
         Args:
@@ -126,12 +126,12 @@ class CategoryService:
         full_tree = self.db.get_category_tree()
 
         def find_subtree(
-            nodes: list[dict[str, Any]], category_id: int
-        ) -> Optional[dict[str, Any]]:
+            nodes: list[CategoryTreeNode], category_id: int
+        ) -> Optional[CategoryTreeNode]:
             for node in nodes:
-                if node.get("id") == category_id:
+                if node.id == category_id:
                     return node
-                child_match = find_subtree(node.get("children", []), category_id)
+                child_match = find_subtree(list(node.children), category_id)
                 if child_match is not None:
                     return child_match
             return None

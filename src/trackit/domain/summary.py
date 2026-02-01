@@ -4,7 +4,12 @@ from datetime import date
 from typing import Optional, Sequence, Any
 
 from trackit.database.base import Database
-from trackit.domain.entities import SummaryGroupBy, SummaryReport, Transaction
+from trackit.domain.entities import (
+    SummaryGroupBy,
+    SummaryReport,
+    Transaction,
+    CategoryTreeNode,
+)
 
 
 class SummaryService:
@@ -98,7 +103,7 @@ class SummaryService:
     def build_category_summary(
         self,
         transactions: Sequence[Transaction],
-        category_tree: list[dict],
+        category_tree: list[CategoryTreeNode],
         category_id: Optional[int],
     ) -> list[dict[str, Any]]:
         """Build category summary from transactions and category tree."""
@@ -168,7 +173,7 @@ class SummaryService:
         category_tree = self.get_category_tree(resolved_path)
         return self.build_category_summary(transactions, category_tree, category_id)
 
-    def get_category_tree(self, category_path: Optional[str]) -> list[dict]:
+    def get_category_tree(self, category_path: Optional[str]) -> list[CategoryTreeNode]:
         """Get category tree, filtered by category path if provided."""
         if not category_path:
             return self.db.get_category_tree()
@@ -179,11 +184,13 @@ class SummaryService:
 
         full_tree = self.db.get_category_tree()
 
-        def find_subtree(nodes: list[dict], category_id: int) -> Optional[dict]:
+        def find_subtree(
+            nodes: list[CategoryTreeNode], category_id: int
+        ) -> Optional[CategoryTreeNode]:
             for node in nodes:
-                if node.get("id") == category_id:
+                if node.id == category_id:
                     return node
-                child_match = find_subtree(node.get("children", []), category_id)
+                child_match = find_subtree(list(node.children), category_id)
                 if child_match is not None:
                     return child_match
             return None
@@ -192,7 +199,7 @@ class SummaryService:
         return [subtree] if subtree is not None else []
 
     def build_category_index(
-        self, category_tree: list[dict]
+        self, category_tree: list[CategoryTreeNode]
     ) -> tuple[
         dict[int, dict[str, Any]], dict[int, Optional[int]], dict[int, set[int]]
     ]:
@@ -201,19 +208,14 @@ class SummaryService:
         parent_map: dict[int, Optional[int]] = {}
         children_map: dict[int, set[int]] = {}
 
-        def visit(node: dict) -> None:
-            category_id = node.get("id")
-            if category_id is None:
-                return
-            category_index[category_id] = {
-                "name": node.get("name"),
-                "category_type": node.get("category_type"),
+        def visit(node: CategoryTreeNode) -> None:
+            category_index[node.id] = {
+                "name": node.name,
+                "category_type": node.category_type,
             }
-            parent_map[category_id] = node.get("parent_id")
-            for child in node.get("children", []):
-                child_id = child.get("id")
-                if child_id is not None:
-                    children_map.setdefault(category_id, set()).add(child_id)
+            parent_map[node.id] = node.parent_id
+            for child in node.children:
+                children_map.setdefault(node.id, set()).add(child.id)
                 visit(child)
 
         for root in category_tree or []:
@@ -221,15 +223,17 @@ class SummaryService:
 
         return category_index, parent_map, children_map
 
-    def build_descendant_map(self, category_tree: list[dict]) -> dict[int, set[int]]:
+    def build_descendant_map(
+        self, category_tree: list[CategoryTreeNode]
+    ) -> dict[int, set[int]]:
         """Build map of category IDs to descendant ID sets."""
         descendant_map: dict[int, set[int]] = {}
 
-        def collect_descendants(node: dict) -> set[int]:
-            descendants = {node["id"]}
-            for child in node.get("children", []):
+        def collect_descendants(node: CategoryTreeNode) -> set[int]:
+            descendants = {node.id}
+            for child in node.children:
                 descendants.update(collect_descendants(child))
-            descendant_map[node["id"]] = descendants
+            descendant_map[node.id] = descendants
             return descendants
 
         for root in category_tree or []:

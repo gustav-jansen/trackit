@@ -291,9 +291,9 @@ def _display_columnar_summary_expanded(
 
     if category_tree:
         for cat in category_tree:
-            cat_type = cat.get("category_type")
+            cat_type = cat.category_type
             if cat_type is None:
-                cat_type = summary_service.get_category_type(cat["id"])
+                cat_type = summary_service.get_category_type(cat.id)
             if cat_type == 1:  # Income
                 income_tree.append(cat)
             elif cat_type == 2 and include_transfers:  # Transfer
@@ -441,7 +441,7 @@ def _display_columnar_category_tree(
 
     Args:
         summary_service: SummaryService instance
-        category_tree: List of category dicts with children
+        category_tree: List of category tree nodes with children
         period_keys: Sorted list of period keys
         period_transactions_map: Dict mapping period key to list of transactions
         descendant_map: Map of category IDs to descendant ID sets
@@ -460,12 +460,12 @@ def _display_columnar_category_tree(
         total = sum(
             summary_service.calculate_category_total_for_period(
                 descendant_map,
-                cat["id"],
+                cat.id,
                 period_transactions_map.get(period_key, []),
             )
             for period_key in period_keys
         )
-        return (-abs(total), cat["name"])
+        return (-abs(total), cat.name)
 
     sorted_categories = sorted(category_tree, key=get_sort_key)
 
@@ -475,7 +475,7 @@ def _display_columnar_category_tree(
         for period_key in period_keys:
             period_txns = period_transactions_map.get(period_key, [])
             total = summary_service.calculate_category_total_for_period(
-                descendant_map, cat["id"], period_txns
+                descendant_map, cat.id, period_txns
             )
             period_totals.append(total)
 
@@ -488,7 +488,7 @@ def _display_columnar_category_tree(
             click.echo()
 
         indent_str = " " * (INDENT_SIZE * indent)
-        category_name = cat["name"]
+        category_name = cat.name
         category_width = CATEGORY_WIDTH - (INDENT_SIZE * indent)
 
         row = f"{indent_str}{category_name:<{category_width}}"
@@ -502,10 +502,10 @@ def _display_columnar_category_tree(
         click.echo(row)
 
         # Display children recursively
-        if cat.get("children"):
+        if cat.children:
             _display_columnar_category_tree(
                 summary_service,
-                cat["children"],
+                list(cat.children),
                 period_keys,
                 period_transactions_map,
                 descendant_map,
@@ -527,9 +527,9 @@ def _display_expanded_summary(
     # Sort categories by total value (descending), then by name for ties
     def get_sort_key(cat):
         total = summary_service.calculate_category_total(
-            descendant_map, cat["id"], transactions
+            descendant_map, cat.id, transactions
         )
-        return (-abs(total), cat["name"])  # Negative abs for descending order
+        return (-abs(total), cat.name)  # Negative abs for descending order
 
     sorted_categories = sorted(category_tree, key=get_sort_key)
 
@@ -538,7 +538,7 @@ def _display_expanded_summary(
 
     for i, cat in enumerate(sorted_categories):
         total = summary_service.calculate_category_total(
-            descendant_map, cat["id"], transactions
+            descendant_map, cat.id, transactions
         )
 
         # Skip categories with no transactions (total includes all descendants)
@@ -550,7 +550,7 @@ def _display_expanded_summary(
             click.echo()
 
         indent_str = " " * (INDENT_SIZE * indent)
-        category_name = cat["name"]
+        category_name = cat.name
         total_str = f"${total:,.2f}"
         # Calculate available width for category name (50 - indent length)
         category_width = 50 - (INDENT_SIZE * indent)
@@ -562,11 +562,11 @@ def _display_expanded_summary(
         )
 
         # Display children recursively (they will be sorted in the recursive call)
-        if cat.get("children"):
+        if cat.children:
             _display_expanded_summary(
                 summary_service,
                 descendant_map,
-                cat["children"],
+                list(cat.children),
                 transactions,
                 indent + 1,
                 is_first=False,
@@ -744,9 +744,9 @@ def summary(
         if category_tree:
             for cat in category_tree:
                 # Use category_type from tree if available, otherwise look it up
-                cat_type = cat.get("category_type")
+                cat_type = cat.category_type
                 if cat_type is None:
-                    cat_type = summary_service.get_category_type(cat["id"])
+                    cat_type = summary_service.get_category_type(cat.id)
                 if cat_type == 1:  # Income
                     income_tree.append(cat)
                 elif (
@@ -767,7 +767,7 @@ def summary(
             click.echo("*" * 80)
             for cat in income_tree:
                 total = summary_service.calculate_category_total(
-                    descendant_map, cat["id"], list(report.transactions)
+                    descendant_map, cat.id, list(report.transactions)
                 )
                 income_subtotal += total
             _display_expanded_summary(
@@ -791,7 +791,7 @@ def summary(
             click.echo("*" * 80)
             for cat in transfer_tree:
                 total = summary_service.calculate_category_total(
-                    descendant_map, cat["id"], list(report.transactions)
+                    descendant_map, cat.id, list(report.transactions)
                 )
                 transfer_subtotal += total
             _display_expanded_summary(
@@ -816,7 +816,7 @@ def summary(
         if expense_tree:
             for cat in expense_tree:
                 total = summary_service.calculate_category_total(
-                    descendant_map, cat["id"], list(report.transactions)
+                    descendant_map, cat.id, list(report.transactions)
                 )
                 expense_subtotal += total
             _display_expanded_summary(

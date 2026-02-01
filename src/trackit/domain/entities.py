@@ -108,7 +108,7 @@ class SummaryReport:
     transactions: tuple["Transaction", ...]
     period_keys: tuple[str, ...]
     period_transactions_map: dict[str, tuple["Transaction", ...]]
-    category_tree: tuple[dict, ...]
+    category_tree: tuple["CategoryTreeNode", ...]
     descendant_map: dict[int, set[int]]
     category_summaries: tuple[dict, ...]
     groups: tuple[SummaryGroup, ...] = ()
