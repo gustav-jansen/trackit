@@ -3,6 +3,7 @@
 import pytest
 from click.testing import CliRunner
 from trackit.cli.main import cli
+from trackit.domain.entities import CategoryTreeNode
 
 
 def test_init_categories(cli_runner, temp_db):
@@ -41,6 +42,28 @@ def test_category_list(cli_runner, temp_db, sample_categories):
     assert result.exit_code == 0
     assert "Income" in result.output
     assert "Food & Dining" in result.output
+
+
+def test_category_list_includes_ids(cli_runner, temp_db, sample_categories):
+    """Test category list output includes IDs and hierarchy."""
+    result = cli_runner.invoke(
+        cli, ["--db-path", temp_db.database_path, "category", "list"]
+    )
+
+    assert result.exit_code == 0
+    assert "Food & Dining (ID:" in result.output
+    assert "  Groceries (ID:" in result.output
+
+
+def test_category_service_tree_nodes(category_service, sample_categories):
+    """Test category service returns tree nodes with children."""
+    tree = category_service.get_category_tree()
+
+    assert tree
+    assert all(isinstance(node, CategoryTreeNode) for node in tree)
+    food_node = next(node for node in tree if node.name == "Food & Dining")
+    assert food_node.children
+    assert any(child.name == "Groceries" for child in food_node.children)
 
 
 def test_category_create_root(cli_runner, temp_db):
@@ -165,4 +188,3 @@ def test_category_create_defaults_to_expense(cli_runner, temp_db):
 
     assert result.exit_code == 0
     assert "Created category 'Test Default'" in result.output
-

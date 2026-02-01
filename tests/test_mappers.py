@@ -14,6 +14,7 @@ from trackit.database.models import (
 from trackit.database.mappers import (
     account_to_domain,
     category_to_domain,
+    category_tree_to_domain,
     transaction_to_domain,
     csv_format_to_domain,
     csv_column_mapping_to_domain,
@@ -21,6 +22,7 @@ from trackit.database.mappers import (
 from trackit.domain.entities import (
     Account,
     Category,
+    CategoryTreeNode,
     Transaction,
     CSVFormat,
     CSVColumnMapping,
@@ -77,6 +79,43 @@ class TestCategoryMapper:
         domain_category = category_to_domain(orm_category)
 
         assert domain_category.parent_id == 1
+
+    def test_category_tree_to_domain(self):
+        """Test converting ORM categories into a domain tree."""
+        root = ORMCategory(
+            id=1,
+            name="Food & Dining",
+            parent_id=None,
+            category_type=0,
+            created_at=datetime.now(UTC),
+        )
+        child = ORMCategory(
+            id=2,
+            name="Groceries",
+            parent_id=1,
+            category_type=0,
+            created_at=datetime.now(UTC),
+        )
+        root_income = ORMCategory(
+            id=3,
+            name="Income",
+            parent_id=None,
+            category_type=1,
+            created_at=datetime.now(UTC),
+        )
+
+        tree = category_tree_to_domain([root, child, root_income])
+
+        assert all(isinstance(node, CategoryTreeNode) for node in tree)
+        names = {node.name for node in tree}
+        assert names == {"Food & Dining", "Income"}
+
+        food_node = next(node for node in tree if node.name == "Food & Dining")
+        assert food_node.parent_id is None
+        assert food_node.category_type == 0
+        assert len(food_node.children) == 1
+        assert food_node.children[0].name == "Groceries"
+        assert food_node.children[0].parent_id == 1
 
 
 class TestTransactionMapper:

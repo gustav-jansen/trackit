@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from trackit.domain.summary import SummaryService
-from trackit.domain.entities import SummaryGroupBy, Transaction
+from trackit.domain.entities import SummaryGroupBy, Transaction, CategoryTreeNode
 
 
 def _find_node_by_name(nodes, name):
@@ -50,6 +50,61 @@ def test_build_descendant_map_includes_children(temp_db, sample_categories):
     assert parent_id in descendant_map
     assert parent_id in descendant_map[parent_id]
     assert child_id in descendant_map[parent_id]
+
+
+def test_build_category_index_with_tree_nodes(temp_db):
+    summary_service = SummaryService(temp_db)
+    tree = [
+        CategoryTreeNode(
+            id=1,
+            name="Food & Dining",
+            parent_id=None,
+            category_type=0,
+            children=(
+                CategoryTreeNode(
+                    id=2,
+                    name="Groceries",
+                    parent_id=1,
+                    category_type=0,
+                ),
+            ),
+        )
+    ]
+
+    category_index, parent_map, children_map = summary_service.build_category_index(
+        tree
+    )
+
+    assert category_index[1]["name"] == "Food & Dining"
+    assert category_index[2]["name"] == "Groceries"
+    assert parent_map[1] is None
+    assert parent_map[2] == 1
+    assert children_map[1] == {2}
+
+
+def test_build_descendant_map_with_tree_nodes(temp_db):
+    summary_service = SummaryService(temp_db)
+    tree = [
+        CategoryTreeNode(
+            id=10,
+            name="Income",
+            parent_id=None,
+            category_type=1,
+            children=(
+                CategoryTreeNode(
+                    id=11,
+                    name="Salary",
+                    parent_id=10,
+                    category_type=1,
+                ),
+            ),
+        )
+    ]
+
+    descendant_map = summary_service.build_descendant_map(tree)
+
+    assert descendant_map[10] == {10, 11}
+    assert descendant_map[11] == {11}
 
 
 def test_get_category_tree_with_filter(temp_db, sample_categories):
