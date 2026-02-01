@@ -1,6 +1,6 @@
 """Generic SQLAlchemy database implementation."""
 
-from typing import Optional, Any
+from typing import Optional
 from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from trackit.database.models import (
 from trackit.database.mappers import (
     account_to_domain,
     category_to_domain,
+    category_tree_to_domain,
     transaction_to_domain,
     csv_format_to_domain,
     csv_column_mapping_to_domain,
@@ -28,6 +29,7 @@ from trackit.domain.entities import (
     Transaction as DomainTransaction,
     CSVFormat as DomainCSVFormat,
     CSVColumnMapping as DomainCSVColumnMapping,
+    CategoryTreeNode as DomainCategoryTreeNode,
 )
 
 
@@ -355,32 +357,11 @@ class SQLAlchemyDatabase(Database):
         categories = query.order_by(Category.name).all()
         return [category_to_domain(cat) for cat in categories]
 
-    def get_category_tree(self) -> list[dict[str, Any]]:
+    def get_category_tree(self) -> list[DomainCategoryTreeNode]:
         """Get full category tree with hierarchy."""
         session = self._get_session()
         all_categories = session.query(Category).order_by(Category.name).all()
-
-        def build_tree(
-            categories: list[Category], parent_id: Optional[int] = None
-        ) -> list[dict[str, Any]]:
-            result = []
-            for cat in categories:
-                if cat.parent_id == parent_id:
-                    children = build_tree(categories, cat.id)
-                    cat_domain = category_to_domain(cat)
-                    result.append(
-                        {
-                            "id": cat_domain.id,
-                            "name": cat_domain.name,
-                            "parent_id": cat_domain.parent_id,
-                            "category_type": cat_domain.category_type,
-                            "created_at": cat_domain.created_at,
-                            "children": children,
-                        }
-                    )
-            return result
-
-        return build_tree(all_categories)
+        return category_tree_to_domain(all_categories)
 
     # Transaction operations
     def create_transaction(

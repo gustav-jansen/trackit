@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 
 
 @dataclass(frozen=True)
@@ -37,12 +37,26 @@ class Category:
 class CategoryTreeNode:
     """Category tree node domain entity.
 
-    Represents the minimal category tree shape (name + children) used for
-    hierarchical displays while keeping the structure explicit and typed.
+    Represents the minimal category tree shape used for hierarchical displays
+    while keeping the structure explicit and typed.
     """
 
+    id: int
     name: str
+    parent_id: Optional[int]
+    category_type: int
     children: tuple["CategoryTreeNode", ...] = ()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dictionary-style access for compatibility with existing usage."""
+        return getattr(self, key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        """Allow bracket access for required keys."""
+        try:
+            return getattr(self, key)
+        except AttributeError as exc:
+            raise KeyError(key) from exc
 
 
 @dataclass(frozen=True)

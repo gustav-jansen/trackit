@@ -1,7 +1,7 @@
 """Abstract database interface."""
 
 from abc import ABC, abstractmethod
-from typing import Optional, Any
+from typing import Optional
 from datetime import date
 from decimal import Decimal
 
@@ -9,6 +9,7 @@ from decimal import Decimal
 from trackit.domain.entities import (
     Account,
     Category,
+    CategoryTreeNode,
     Transaction,
     CSVFormat,
     CSVColumnMapping,
@@ -224,12 +225,8 @@ class Database(ABC):
         pass
 
     @abstractmethod
-    def get_category_tree(self) -> list[dict[str, Any]]:
-        """Get full category tree with hierarchy.
-
-        Returns a list of dictionaries with category data and nested 'children' lists.
-        This structure is used for hierarchical display and is kept as dict for convenience.
-        """
+    def get_category_tree(self) -> list[CategoryTreeNode]:
+        """Get full category tree with hierarchy."""
         pass
 
     # Transaction operations

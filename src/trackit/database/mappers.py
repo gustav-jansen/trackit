@@ -35,6 +35,30 @@ def category_to_domain(orm_category: ORMCategory) -> domain.Category:
     )
 
 
+def category_tree_to_domain(
+    categories: list[ORMCategory],
+) -> list[domain.CategoryTreeNode]:
+    """Convert a list of ORM categories into a domain category tree."""
+
+    def build_tree(parent_id: int | None = None) -> list[domain.CategoryTreeNode]:
+        nodes: list[domain.CategoryTreeNode] = []
+        for cat in categories:
+            if cat.parent_id == parent_id:
+                children = build_tree(cat.id)
+                nodes.append(
+                    domain.CategoryTreeNode(
+                        id=cat.id,
+                        name=cat.name,
+                        parent_id=cat.parent_id,
+                        category_type=cat.category_type,
+                        children=tuple(children),
+                    )
+                )
+        return nodes
+
+    return build_tree()
+
+
 def transaction_to_domain(orm_transaction: ORMTransaction) -> domain.Transaction:
     """Convert SQLAlchemy Transaction model to domain Transaction entity."""
     return domain.Transaction(
@@ -64,7 +88,9 @@ def csv_format_to_domain(orm_format: ORMCSVFormat) -> domain.CSVFormat:
     )
 
 
-def csv_column_mapping_to_domain(orm_mapping: ORMCSVColumnMapping) -> domain.CSVColumnMapping:
+def csv_column_mapping_to_domain(
+    orm_mapping: ORMCSVColumnMapping,
+) -> domain.CSVColumnMapping:
     """Convert SQLAlchemy CSVColumnMapping model to domain CSVColumnMapping entity."""
     return domain.CSVColumnMapping(
         id=orm_mapping.id,
