@@ -555,10 +555,10 @@ def test_summary_expand_category_filter_orders_children(
     assert groceries_index < coffee_index
 
 
-def test_summary_category_filter_nonexistent_path_shows_default_summary(
+def test_summary_category_filter_nonexistent_path_shows_empty_summary(
     cli_runner, temp_db, sample_account, sample_categories, transaction_service
 ):
-    """Test that a non-existent category path does not filter results."""
+    """Test that a non-existent category path returns no results."""
     from datetime import date
     from decimal import Decimal
 
@@ -584,9 +584,7 @@ def test_summary_category_filter_nonexistent_path_shows_default_summary(
     )
 
     assert result.exit_code == 0
-    assert "Category Summary" in result.output
-    assert "Food & Dining" not in result.output
-    assert "Groceries" not in result.output
+    assert "No transactions found." in result.output
 
 
 def test_summary_expand_with_leaf_category_filter_shows_leaf_only(
@@ -687,9 +685,7 @@ def test_summary_category_filter_case_sensitive(
     )
 
     assert result.exit_code == 0
-    assert "Category Summary" in result.output
-    assert "Food & Dining" not in result.output
-    assert "Groceries" not in result.output
+    assert "No transactions found." in result.output
 
 
 def test_summary_category_filter_transfer_requires_include_transfers(

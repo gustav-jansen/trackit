@@ -276,16 +276,15 @@ class TransactionService:
         Returns:
             List of transaction entities
         """
-        category_id = None
-        if category_path is not None:
-            category = self.db.get_category_by_path(category_path)
-            if category is not None:
-                category_id = category.id
+        summary_service = SummaryService(self.db)
+        category_filter = summary_service.resolve_category_filter(category_path)
+        if category_filter.is_missing:
+            return []
 
         return self.db.get_summary_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_id=category_id,
+            category_id=category_filter.category_id,
             include_transfers=include_transfers,
         )
 
@@ -307,22 +306,17 @@ class TransactionService:
         Returns:
             List of summary dicts
         """
-        category_id = None
-        resolved_path = None
-        if category_path is not None:
-            category = self.db.get_category_by_path(category_path)
-            if category is not None:
-                category_id = category.id
-                resolved_path = category_path
-
         summary_service = SummaryService(self.db)
+        category_filter = summary_service.resolve_category_filter(category_path)
+        if category_filter.is_missing:
+            return []
         transactions = summary_service.get_filtered_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_path=resolved_path,
+            category_path=category_filter.resolved_path,
             include_transfers=include_transfers,
         )
-        category_tree = summary_service.get_category_tree(resolved_path)
+        category_tree = summary_service.get_category_tree(category_filter.resolved_path)
         return summary_service.build_category_summary(
-            transactions, category_tree, category_id
+            transactions, category_tree, category_filter.category_id
         )

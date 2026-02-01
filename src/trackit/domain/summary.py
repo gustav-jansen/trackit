@@ -9,6 +9,7 @@ from trackit.domain.entities import (
     SummaryReport,
     Transaction,
     CategoryTreeNode,
+    SummaryCategoryFilter,
 )
 
 
@@ -60,19 +61,36 @@ class SummaryService:
         group_by: SummaryGroupBy = SummaryGroupBy.CATEGORY,
     ) -> SummaryReport:
         """Build a summary report for formatting."""
+        category_filter = self.resolve_category_filter(category_path)
+        if category_filter.is_missing:
+            return SummaryReport(
+                group_by=group_by,
+                start_date=start_date,
+                end_date=end_date,
+                category_path=category_path,
+                include_transfers=include_transfers,
+                category_filter=category_filter,
+                transactions=(),
+                period_keys=(),
+                period_transactions_map={},
+                category_tree=(),
+                descendant_map={},
+                category_summaries=(),
+            )
+
         transactions = self.get_filtered_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_path=category_path,
+            category_path=category_filter.resolved_path,
             include_transfers=include_transfers,
         )
 
-        category_tree = self.get_category_tree(category_path)
+        category_tree = self.get_category_tree(category_filter.resolved_path)
         descendant_map = self.build_descendant_map(category_tree)
         category_summaries = self.get_category_summaries(
             start_date=start_date,
             end_date=end_date,
-            category_path=category_path,
+            category_path=category_filter.resolved_path,
             include_transfers=include_transfers,
         )
 
@@ -92,12 +110,41 @@ class SummaryService:
             end_date=end_date,
             category_path=category_path,
             include_transfers=include_transfers,
+            category_filter=category_filter,
             transactions=tuple(transactions),
             period_keys=period_keys,
             period_transactions_map=period_transactions_map,
             category_tree=tuple(category_tree),
             descendant_map=descendant_map,
             category_summaries=tuple(category_summaries),
+        )
+
+    def resolve_category_filter(
+        self, category_path: Optional[str]
+    ) -> SummaryCategoryFilter:
+        """Resolve category filters for summary reports."""
+        if category_path is None:
+            return SummaryCategoryFilter(
+                requested_path=None,
+                resolved_path=None,
+                category_id=None,
+                is_missing=False,
+            )
+
+        category = self.db.get_category_by_path(category_path)
+        if category is None:
+            return SummaryCategoryFilter(
+                requested_path=category_path,
+                resolved_path=None,
+                category_id=None,
+                is_missing=True,
+            )
+
+        return SummaryCategoryFilter(
+            requested_path=category_path,
+            resolved_path=category_path,
+            category_id=category.id,
+            is_missing=False,
         )
 
     def build_category_summary(
@@ -135,16 +182,14 @@ class SummaryService:
         include_transfers: bool = False,
     ) -> list[Transaction]:
         """Get transactions matching summary criteria."""
-        category_id = None
-        if category_path is not None:
-            category = self.db.get_category_by_path(category_path)
-            if category is not None:
-                category_id = category.id
+        category_filter = self.resolve_category_filter(category_path)
+        if category_filter.is_missing:
+            return []
 
         return self.db.get_summary_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_id=category_id,
+            category_id=category_filter.category_id,
             include_transfers=include_transfers,
         )
 
@@ -156,22 +201,20 @@ class SummaryService:
         include_transfers: bool = False,
     ) -> list[dict]:
         """Get category summaries for standard view."""
-        category_id = None
-        resolved_path = None
-        if category_path is not None:
-            category = self.db.get_category_by_path(category_path)
-            if category is not None:
-                category_id = category.id
-                resolved_path = category_path
+        category_filter = self.resolve_category_filter(category_path)
+        if category_filter.is_missing:
+            return []
 
         transactions = self.get_filtered_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_path=resolved_path,
+            category_path=category_filter.resolved_path,
             include_transfers=include_transfers,
         )
-        category_tree = self.get_category_tree(resolved_path)
-        return self.build_category_summary(transactions, category_tree, category_id)
+        category_tree = self.get_category_tree(category_filter.resolved_path)
+        return self.build_category_summary(
+            transactions, category_tree, category_filter.category_id
+        )
 
     def get_category_tree(self, category_path: Optional[str]) -> list[CategoryTreeNode]:
         """Get category tree, filtered by category path if provided."""

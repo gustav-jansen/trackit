@@ -177,7 +177,7 @@ The summary command displays category totals in a single "Total" column (net tot
 **Category path matching**:
 - Paths are case-sensitive.
 - Extra whitespace around path segments is ignored.
-- If a path does not match any category, the summary still shows the overall total but no category rows.
+ - If a path does not match any category, the summary shows no results ("No transactions found.").
 
 **Columnar grouping options** (`--group-by-month` or `--group-by-year`):
 - Transform the output into a columnar format where each column represents a time period (month or year)

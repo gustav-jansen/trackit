@@ -105,6 +105,7 @@ class SummaryReport:
     end_date: Optional[date]
     category_path: Optional[str]
     include_transfers: bool
+    category_filter: "SummaryCategoryFilter"
     transactions: tuple["Transaction", ...]
     period_keys: tuple[str, ...]
     period_transactions_map: dict[str, tuple["Transaction", ...]]
@@ -112,6 +113,16 @@ class SummaryReport:
     descendant_map: dict[int, set[int]]
     category_summaries: tuple[dict, ...]
     groups: tuple[SummaryGroup, ...] = ()
+
+
+@dataclass(frozen=True)
+class SummaryCategoryFilter:
+    """Resolved category filter for summary reports."""
+
+    requested_path: Optional[str]
+    resolved_path: Optional[str]
+    category_id: Optional[int]
+    is_missing: bool
 
 
 @dataclass(frozen=True)
