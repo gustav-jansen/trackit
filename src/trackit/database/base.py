@@ -348,18 +348,3 @@ class Database(ABC):
         Includes descendant categories when category_id is provided.
         """
         pass
-
-    @abstractmethod
-    def get_category_summary(
-        self,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-        category_id: Optional[int] = None,
-        include_transfers: bool = False,
-    ) -> list[dict[str, Any]]:
-        """Get summary of expenses by category.
-
-        Returns a list of dictionaries with summary data (category_id, category_name,
-        expenses, income, count). This structure is kept as dict for aggregation results.
-        """
-        pass

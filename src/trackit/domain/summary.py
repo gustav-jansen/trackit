@@ -152,17 +152,21 @@ class SummaryService:
     ) -> list[dict]:
         """Get category summaries for standard view."""
         category_id = None
+        resolved_path = None
         if category_path is not None:
             category = self.db.get_category_by_path(category_path)
             if category is not None:
                 category_id = category.id
+                resolved_path = category_path
 
-        return self.db.get_category_summary(
+        transactions = self.get_filtered_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_id=category_id,
+            category_path=resolved_path,
             include_transfers=include_transfers,
         )
+        category_tree = self.get_category_tree(resolved_path)
+        return self.build_category_summary(transactions, category_tree, category_id)
 
     def get_category_tree(self, category_path: Optional[str]) -> list[dict]:
         """Get category tree, filtered by category path if provided."""

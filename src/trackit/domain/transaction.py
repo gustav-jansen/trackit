@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 from trackit.database.base import Database
 from trackit.domain.entities import Transaction as TransactionEntity
+from trackit.domain.summary import SummaryService
 from trackit.domain.errors import (
     account_not_found,
     category_not_found,
@@ -307,14 +308,21 @@ class TransactionService:
             List of summary dicts
         """
         category_id = None
+        resolved_path = None
         if category_path is not None:
             category = self.db.get_category_by_path(category_path)
             if category is not None:
                 category_id = category.id
+                resolved_path = category_path
 
-        return self.db.get_category_summary(
+        summary_service = SummaryService(self.db)
+        transactions = summary_service.get_filtered_transactions(
             start_date=start_date,
             end_date=end_date,
-            category_id=category_id,
+            category_path=resolved_path,
             include_transfers=include_transfers,
+        )
+        category_tree = summary_service.get_category_tree(resolved_path)
+        return summary_service.build_category_summary(
+            transactions, category_tree, category_id
         )
