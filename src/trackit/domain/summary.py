@@ -1,7 +1,7 @@
 """Summary grouping domain service."""
 
 from datetime import date
-from typing import Optional
+from typing import Optional, Sequence
 
 from trackit.database.base import Database
 from trackit.domain.entities import SummaryGroupBy, SummaryReport, Transaction
@@ -38,17 +38,61 @@ class SummaryService:
         Returns:
             SummaryReport describing grouped transactions
         """
+        return self.build_summary_report(
+            start_date=start_date,
+            end_date=end_date,
+            category_path=category_path,
+            include_transfers=include_transfers,
+            group_by=group_by,
+        )
+
+    def build_summary_report(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category_path: Optional[str] = None,
+        include_transfers: bool = False,
+        group_by: SummaryGroupBy = SummaryGroupBy.CATEGORY,
+    ) -> SummaryReport:
+        """Build a summary report for formatting."""
         transactions = self.get_filtered_transactions(
             start_date=start_date,
             end_date=end_date,
             category_path=category_path,
             include_transfers=include_transfers,
         )
+
+        category_tree = self.get_category_tree(category_path)
+        descendant_map = self.build_descendant_map(category_tree)
+        category_summaries = self.get_category_summaries(
+            start_date=start_date,
+            end_date=end_date,
+            category_path=category_path,
+            include_transfers=include_transfers,
+        )
+
+        period_transactions_map: dict[str, tuple[Transaction, ...]] = {}
+        period_keys: tuple[str, ...] = ()
+        if group_by in (SummaryGroupBy.CATEGORY_MONTH, SummaryGroupBy.CATEGORY_YEAR):
+            group_by_month = group_by == SummaryGroupBy.CATEGORY_MONTH
+            grouped = self.group_transactions_by_period(transactions, group_by_month)
+            period_transactions_map = {
+                key: tuple(value) for key, value in grouped.items()
+            }
+            period_keys = tuple(sorted(period_transactions_map.keys()))
+
         return SummaryReport(
             group_by=group_by,
             start_date=start_date,
             end_date=end_date,
-            groups=(),
+            category_path=category_path,
+            include_transfers=include_transfers,
+            transactions=tuple(transactions),
+            period_keys=period_keys,
+            period_transactions_map=period_transactions_map,
+            category_tree=tuple(category_tree),
+            descendant_map=descendant_map,
+            category_summaries=tuple(category_summaries),
         )
 
     def get_filtered_transactions(
@@ -66,6 +110,27 @@ class SummaryService:
                 category_id = category.id
 
         return self.db.get_summary_transactions(
+            start_date=start_date,
+            end_date=end_date,
+            category_id=category_id,
+            include_transfers=include_transfers,
+        )
+
+    def get_category_summaries(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        category_path: Optional[str] = None,
+        include_transfers: bool = False,
+    ) -> list[dict]:
+        """Get category summaries for standard view."""
+        category_id = None
+        if category_path is not None:
+            category = self.db.get_category_by_path(category_path)
+            if category is not None:
+                category_id = category.id
+
+        return self.db.get_category_summary(
             start_date=start_date,
             end_date=end_date,
             category_id=category_id,
@@ -139,7 +204,7 @@ class SummaryService:
         self,
         descendant_map: dict[int, set[int]],
         category_id: Optional[int],
-        transactions: list[Transaction],
+        transactions: Sequence[Transaction],
     ) -> float:
         """Calculate total for a category including all its descendants."""
         if category_id is None:
@@ -158,7 +223,7 @@ class SummaryService:
         self,
         descendant_map: dict[int, set[int]],
         category_id: Optional[int],
-        period_transactions: list[Transaction],
+        period_transactions: Sequence[Transaction],
     ) -> float:
         """Calculate total for a category in a specific period."""
         if category_id is None:

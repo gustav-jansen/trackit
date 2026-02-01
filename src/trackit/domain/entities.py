@@ -77,7 +77,15 @@ class SummaryReport:
     group_by: SummaryGroupBy
     start_date: Optional[date]
     end_date: Optional[date]
-    groups: tuple[SummaryGroup, ...]
+    category_path: Optional[str]
+    include_transfers: bool
+    transactions: tuple["Transaction", ...]
+    period_keys: tuple[str, ...]
+    period_transactions_map: dict[str, tuple["Transaction", ...]]
+    category_tree: tuple[dict, ...]
+    descendant_map: dict[int, set[int]]
+    category_summaries: tuple[dict, ...]
+    groups: tuple[SummaryGroup, ...] = ()
 
 
 @dataclass(frozen=True)

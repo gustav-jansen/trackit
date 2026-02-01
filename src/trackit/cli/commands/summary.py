@@ -3,6 +3,7 @@
 import click
 from trackit.cli.date_filters import resolve_cli_date_range
 from trackit.domain.summary import SummaryService
+from trackit.domain.entities import SummaryGroupBy
 from trackit.domain.transaction import TransactionService
 from trackit.utils.date_parser import get_last_six_months_range
 
@@ -651,27 +652,28 @@ def summary(
         default_range=get_last_six_months_range(),
     )
 
-    # Get filtered transactions for overall total calculation
-    filtered_transactions = summary_service.get_filtered_transactions(
+    group_by = (
+        SummaryGroupBy.CATEGORY_YEAR if group_by_year else SummaryGroupBy.CATEGORY_MONTH
+    )
+    report = summary_service.build_summary_report(
         start_date=start,
         end_date=end,
         category_path=category,
         include_transfers=include_transfers,
+        group_by=group_by,
     )
 
-    if not filtered_transactions:
+    if not report.transactions:
         click.echo("No transactions found.")
         return
 
     # Check if grouping is enabled
     if group_by_month or group_by_year:
         # Group transactions by period
-        period_transactions_map = summary_service.group_transactions_by_period(
-            filtered_transactions, group_by_month
-        )
+        period_transactions_map = report.period_transactions_map
 
         # Get sorted list of period keys (chronologically ascending)
-        period_keys = sorted(period_transactions_map.keys())
+        period_keys = list(report.period_keys)
 
         if not period_keys:
             click.echo("No transactions found.")
@@ -679,11 +681,11 @@ def summary(
 
         if expand:
             # Expanded columnar view
-            category_tree = summary_service.get_category_tree(category)
-            descendant_map = summary_service.build_descendant_map(category_tree)
+            category_tree = list(report.category_tree)
+            descendant_map = report.descendant_map
 
             has_uncategorized = any(
-                txn.category_id is None for txn in filtered_transactions
+                txn.category_id is None for txn in report.transactions
             )
 
             click.echo("\nCategory Summary (Expanded):")
@@ -698,20 +700,15 @@ def summary(
             )
         else:
             # Standard columnar view
-            summaries = service.get_summary(
-                start_date=start,
-                end_date=end,
-                category_path=category,
-                include_transfers=include_transfers,
-            )
+            summaries = list(report.category_summaries)
 
             if not summaries:
                 click.echo("No transactions found.")
                 return
 
             click.echo("\nCategory Summary:")
-            category_tree = summary_service.get_category_tree(category)
-            descendant_map = summary_service.build_descendant_map(category_tree)
+            category_tree = list(report.category_tree)
+            descendant_map = report.descendant_map
             _display_columnar_summary_standard(
                 summary_service,
                 summaries,
@@ -723,17 +720,15 @@ def summary(
         return
 
     # Calculate overall total from all filtered transactions
-    overall_total = sum(float(txn.amount) for txn in filtered_transactions)
+    overall_total = sum(float(txn.amount) for txn in report.transactions)
 
     if expand:
         # Expanded view: show full category tree
-        category_tree = summary_service.get_category_tree(category)
-        descendant_map = summary_service.build_descendant_map(category_tree)
+        category_tree = list(report.category_tree)
+        descendant_map = report.descendant_map
 
         # Also include uncategorized if there are any
-        has_uncategorized = any(
-            txn.category_id is None for txn in filtered_transactions
-        )
+        has_uncategorized = any(txn.category_id is None for txn in report.transactions)
 
         click.echo("\nCategory Summary (Expanded):")
         click.echo("-" * 80)
@@ -772,14 +767,14 @@ def summary(
             click.echo("*" * 80)
             for cat in income_tree:
                 total = summary_service.calculate_category_total(
-                    descendant_map, cat["id"], filtered_transactions
+                    descendant_map, cat["id"], list(report.transactions)
                 )
                 income_subtotal += total
             _display_expanded_summary(
                 summary_service,
                 descendant_map,
                 income_tree,
-                filtered_transactions,
+                list(report.transactions),
                 indent=1,
                 is_first=True,
             )
@@ -796,14 +791,14 @@ def summary(
             click.echo("*" * 80)
             for cat in transfer_tree:
                 total = summary_service.calculate_category_total(
-                    descendant_map, cat["id"], filtered_transactions
+                    descendant_map, cat["id"], list(report.transactions)
                 )
                 transfer_subtotal += total
             _display_expanded_summary(
                 summary_service,
                 descendant_map,
                 transfer_tree,
-                filtered_transactions,
+                list(report.transactions),
                 indent=1,
                 is_first=True,
             )
@@ -821,14 +816,14 @@ def summary(
         if expense_tree:
             for cat in expense_tree:
                 total = summary_service.calculate_category_total(
-                    descendant_map, cat["id"], filtered_transactions
+                    descendant_map, cat["id"], list(report.transactions)
                 )
                 expense_subtotal += total
             _display_expanded_summary(
                 summary_service,
                 descendant_map,
                 expense_tree,
-                filtered_transactions,
+                list(report.transactions),
                 indent=1,
                 is_first=True,
             )
@@ -836,7 +831,7 @@ def summary(
         # Display uncategorized if present (treated as Expense)
         if has_uncategorized:
             uncategorized_total = summary_service.calculate_category_total(
-                descendant_map, None, filtered_transactions
+                descendant_map, None, list(report.transactions)
             )
             expense_subtotal += uncategorized_total
             if uncategorized_total != 0:
