@@ -1,4 +1,28 @@
-"""Shared domain error messages."""
+"""Shared domain error messages and error types."""
+
+
+class DomainError(ValueError):
+    """Base class for domain-level errors.
+
+    Subclasses provide semantic categories while preserving ValueError
+    compatibility for existing error handling.
+    """
+
+
+class ValidationError(DomainError):
+    """Invalid input or failed validation in domain logic."""
+
+
+class NotFoundError(DomainError):
+    """Requested domain entity or path does not exist."""
+
+
+class ConflictError(DomainError):
+    """Domain conflict, such as uniqueness violations."""
+
+
+class DependencyError(DomainError):
+    """Operation blocked due to dependent domain data."""
 
 
 def account_not_found(account_id: int) -> str:

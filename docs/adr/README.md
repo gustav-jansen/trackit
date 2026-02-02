@@ -29,6 +29,10 @@ Each ADR should include:
   - Read when touching: `src/trackit/utils/date_parser.py`, CLI commands that accept date options,
     summary/list behaviors, category traversal.
 
+- **ADR-0003: Domain error taxonomy**
+  - Governs: domain error types, classification, and mapping to user-visible messages.
+  - Read when touching: `src/trackit/domain/errors.py`, domain services, CLI error handling.
+
 ## Notes
 
 - Playbooks under `docs/playbooks/` contain detailed procedures and examples.
