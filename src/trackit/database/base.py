@@ -62,7 +62,7 @@ class Database(ABC):
             bank_name: Optional new bank name (if None, bank_name is not updated)
 
         Raises:
-            ValueError: If account not found or name already exists
+            ValueError: If name already exists
         """
         pass
 
@@ -74,7 +74,7 @@ class Database(ABC):
             account_id: Account ID to delete
 
         Raises:
-            ValueError: If account not found or has associated transactions/formats
+            ValueError: If account has associated transactions/formats
         """
         pass
 
@@ -176,7 +176,7 @@ class Database(ABC):
             negate_credit: Optional flag to enable/disable credit negation
 
         Raises:
-            ValueError: If format not found or name already exists
+            ValueError: If name already exists
         """
         pass
 
@@ -186,9 +186,6 @@ class Database(ABC):
 
         Args:
             format_id: Format ID to delete
-
-        Raises:
-            ValueError: If format not found
         """
         pass
 
@@ -295,8 +292,6 @@ class Database(ABC):
             notes: Optional new notes
             update_category: If True, update category_id even if it's None (to clear it)
 
-        Raises:
-            ValueError: If transaction not found
         """
         pass
 
@@ -307,8 +302,6 @@ class Database(ABC):
         Args:
             transaction_id: Transaction ID to delete
 
-        Raises:
-            ValueError: If transaction not found
         """
         pass
 

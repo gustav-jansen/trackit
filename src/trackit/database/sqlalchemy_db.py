@@ -98,7 +98,7 @@ class SQLAlchemyDatabase(Database):
         session = self._get_session()
         account = session.query(Account).filter(Account.id == account_id).first()
         if account is None:
-            raise ValueError(f"Account {account_id} not found")
+            return None
 
         # Check for duplicate name (excluding current account)
         existing = (
@@ -119,7 +119,7 @@ class SQLAlchemyDatabase(Database):
         session = self._get_session()
         account = session.query(Account).filter(Account.id == account_id).first()
         if account is None:
-            raise ValueError(f"Account {account_id} not found")
+            return None
 
         # Check for associated transactions
         transaction_count = (
@@ -259,7 +259,7 @@ class SQLAlchemyDatabase(Database):
         session = self._get_session()
         fmt = session.query(CSVFormat).filter(CSVFormat.id == format_id).first()
         if fmt is None:
-            raise ValueError(f"CSV format {format_id} not found")
+            return None
 
         if name is not None:
             # Check for duplicate name (excluding current format)
@@ -291,7 +291,7 @@ class SQLAlchemyDatabase(Database):
         session = self._get_session()
         fmt = session.query(CSVFormat).filter(CSVFormat.id == format_id).first()
         if fmt is None:
-            raise ValueError(f"CSV format {format_id} not found")
+            return None
         session.delete(fmt)
         session.commit()
 
@@ -421,7 +421,7 @@ class SQLAlchemyDatabase(Database):
             session.query(Transaction).filter(Transaction.id == transaction_id).first()
         )
         if transaction is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            return None
         transaction.category_id = category_id
         session.commit()
 
@@ -434,7 +434,7 @@ class SQLAlchemyDatabase(Database):
             session.query(Transaction).filter(Transaction.id == transaction_id).first()
         )
         if transaction is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            return None
         transaction.notes = notes
         session.commit()
 
@@ -460,7 +460,7 @@ class SQLAlchemyDatabase(Database):
             session.query(Transaction).filter(Transaction.id == transaction_id).first()
         )
         if transaction is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            return None
 
         if account_id is not None:
             transaction.account_id = account_id
@@ -488,7 +488,7 @@ class SQLAlchemyDatabase(Database):
             session.query(Transaction).filter(Transaction.id == transaction_id).first()
         )
         if transaction is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            return None
         session.delete(transaction)
         session.commit()
 
