@@ -2,18 +2,54 @@
 
 import csv
 import hashlib
-from typing import Any
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 from trackit.database.base import Database
 from trackit.domain.transaction import TransactionService
 from trackit.domain.account import AccountService
 from trackit.domain.csv_format import CSVFormatService
-from trackit.domain.errors import NotFoundError, ValidationError
+from trackit.domain.errors import DomainError, NotFoundError, ValidationError
 from trackit.utils.date_parser import parse_date
 from trackit.utils.amount_parser import parse_amount
+
+
+@dataclass
+class SkippedTransaction:
+    """Details for a skipped CSV transaction."""
+
+    row_num: int
+    reason: str
+    details: dict[str, str]
+
+
+@dataclass
+class ImportResult:
+    """Structured result for CSV import."""
+
+    imported: int = 0
+    skipped: int = 0
+    skipped_details: list[SkippedTransaction] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a dict representation for CLI compatibility."""
+        return {
+            "imported": self.imported,
+            "skipped": self.skipped,
+            "skipped_details": [
+                {
+                    "row_num": skipped.row_num,
+                    "reason": skipped.reason,
+                    "details": skipped.details,
+                }
+                for skipped in self.skipped_details
+            ],
+            "errors": self.errors,
+        }
 
 
 class CSVImportService:
@@ -86,10 +122,7 @@ class CSVImportService:
         if not csv_path.exists():
             raise FileNotFoundError(f"CSV file not found: {csv_file_path}")
 
-        imported = 0
-        skipped = 0
-        skipped_details = []
-        errors = []
+        result = ImportResult()
 
         # Check if unique_id is mapped
         has_unique_id_mapping = "unique_id" in column_map.values()
@@ -141,19 +174,19 @@ class CSVImportService:
                     # Get unique_id if mapped, otherwise generate it
                     unique_id = values.get("unique_id")
                     if not unique_id and has_unique_id_mapping:
-                        errors.append(f"Row {row_num}: Missing unique_id")
+                        result.errors.append(f"Row {row_num}: Missing unique_id")
                         continue
 
                     date_str = values.get("date")
                     if not date_str:
-                        errors.append(f"Row {row_num}: Missing date")
+                        result.errors.append(f"Row {row_num}: Missing date")
                         continue
 
                     # Parse date
                     try:
                         txn_date = parse_date(date_str)
                     except ValueError as e:
-                        errors.append(f"Row {row_num}: {e}")
+                        result.errors.append(f"Row {row_num}: {e}")
                         continue
 
                     # Handle amount based on format type
@@ -161,39 +194,52 @@ class CSVImportService:
                         # Debit/credit format: read from both columns
                         debit_str = values.get("debit")
                         credit_str = values.get("credit")
+                        debit_value = debit_str if isinstance(debit_str, str) else None
+                        credit_value = (
+                            credit_str if isinstance(credit_str, str) else None
+                        )
 
                         # Check that exactly one has a value
-                        has_debit = debit_str and debit_str.strip()
-                        has_credit = credit_str and credit_str.strip()
+                        has_debit = (
+                            debit_value is not None and debit_value.strip() != ""
+                        )
+                        has_credit = (
+                            credit_value is not None and credit_value.strip() != ""
+                        )
 
                         if not has_debit and not has_credit:
-                            errors.append(
+                            result.errors.append(
                                 f"Row {row_num}: Missing both debit and credit values (exactly one required)"
                             )
                             continue
 
                         if has_debit and has_credit:
-                            errors.append(
+                            result.errors.append(
                                 f"Row {row_num}: Both debit and credit have values (exactly one required)"
                             )
                             continue
 
                         # Parse the value that exists
-                        if has_debit:
+                        if has_debit and debit_value is not None:
                             try:
-                                debit_amount = parse_amount(debit_str)
+                                debit_amount = parse_amount(debit_value)
                                 # Apply negation if configured
                                 amount = (
                                     -debit_amount if fmt.negate_debit else debit_amount
                                 )
                             except ValueError as e:
-                                errors.append(
+                                result.errors.append(
                                     f"Row {row_num}: Invalid debit value: {e}"
                                 )
                                 continue
                         else:  # has_credit
                             try:
-                                credit_amount = parse_amount(credit_str)
+                                if credit_value is None:
+                                    result.errors.append(
+                                        f"Row {row_num}: Missing credit value"
+                                    )
+                                    continue
+                                credit_amount = parse_amount(credit_value)
                                 # Apply negation if configured
                                 amount = (
                                     -credit_amount
@@ -201,28 +247,28 @@ class CSVImportService:
                                     else credit_amount
                                 )
                             except ValueError as e:
-                                errors.append(
+                                result.errors.append(
                                     f"Row {row_num}: Invalid credit value: {e}"
                                 )
                                 continue
                     else:
                         # Regular format: read from amount column
                         amount_str = values.get("amount")
-                        if not amount_str:
-                            errors.append(f"Row {row_num}: Missing amount")
+                        if not isinstance(amount_str, str) or amount_str == "":
+                            result.errors.append(f"Row {row_num}: Missing amount")
                             continue
 
                         try:
                             amount = parse_amount(amount_str)
                         except ValueError as e:
-                            errors.append(f"Row {row_num}: {e}")
+                            result.errors.append(f"Row {row_num}: {e}")
                             continue
 
                     # If unique_id is not provided, generate it from date, description, and amount
                     if not unique_id:
                         description = values.get("description")
                         if not description:
-                            errors.append(
+                            result.errors.append(
                                 f"Row {row_num}: Missing description (required when unique_id is not provided)"
                             )
                             continue
@@ -236,24 +282,24 @@ class CSVImportService:
                     # Verify account still exists
                     account = self.account_service.get_account(account_id)
                     if account is None:
-                        errors.append(
+                        result.errors.append(
                             f"Row {row_num}: Format's account {account_id} no longer exists"
                         )
                         continue
 
                     # Check for duplicate
                     if self.db.transaction_exists(account_id, unique_id):
-                        skipped += 1
-                        skipped_details.append(
-                            {
-                                "row_num": row_num,
-                                "reason": "Duplicate transaction",
-                                "details": {
+                        result.skipped += 1
+                        result.skipped_details.append(
+                            SkippedTransaction(
+                                row_num=row_num,
+                                reason="Duplicate transaction",
+                                details={
                                     "date": str(txn_date),
                                     "description": values.get("description", ""),
                                     "amount": str(amount),
                                 },
-                            }
+                            )
                         )
                         continue
 
@@ -268,15 +314,13 @@ class CSVImportService:
                         category_id=None,  # Categories assigned later
                         notes=None,
                     )
-                    imported += 1
+                    result.imported += 1
 
+                except DomainError as e:
+                    result.errors.append(f"Row {row_num}: {str(e)}")
+                    continue
                 except Exception as e:
-                    errors.append(f"Row {row_num}: {str(e)}")
+                    result.errors.append(f"Row {row_num}: {str(e)}")
                     continue
 
-        return {
-            "imported": imported,
-            "skipped": skipped,
-            "skipped_details": skipped_details,
-            "errors": errors,
-        }
+        return result.to_dict()
