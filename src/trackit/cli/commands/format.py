@@ -4,6 +4,8 @@ import click
 from trackit.domain.csv_format import CSVFormatService
 from trackit.domain.account import AccountService
 from trackit.cli.account_resolution import resolve_account_or_exit
+from trackit.cli.error_handling import handle_domain_error
+from trackit.domain.errors import DomainError
 
 
 @click.group()
@@ -66,9 +68,8 @@ def create_format(
             if negate_credit:
                 click.echo("  Credit values will be negated")
         click.echo("Use 'format map' to add column mappings.")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 @format_group.command("map")
@@ -98,9 +99,8 @@ def map_column(ctx, format_name: str, csv_column: str, db_field: str, required: 
             f"Mapped CSV column '{csv_column}' to '{db_field}' "
             f"(ID: {mapping_id}, Required: {required})"
         )
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 @format_group.command("list")
@@ -257,9 +257,8 @@ def update_format(
             click.echo(f"  Negate debit: {'enabled' if negate_debit else 'disabled'}")
         if negate_credit is not None:
             click.echo(f"  Negate credit: {'enabled' if negate_credit else 'disabled'}")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 @format_group.command("delete")
@@ -290,9 +289,8 @@ def delete_format(ctx, format_name: str) -> None:
     try:
         service.delete_format(fmt.id)
         click.echo(f"Deleted format '{format_name}'")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 def register_commands(cli):

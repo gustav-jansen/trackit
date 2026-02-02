@@ -2,14 +2,22 @@
 
 import click
 from trackit.domain.transaction import TransactionService
+from trackit.cli.error_handling import handle_domain_error
+from trackit.domain.errors import DomainError
 
 
 @click.command("categorize")
 @click.argument("transaction_ids", nargs=-1, required=True, type=int)
 @click.argument("category_path", nargs=1)
-@click.option("--force", is_flag=True, help="Force recategorization of transactions that already have a category")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force recategorization of transactions that already have a category",
+)
 @click.pass_context
-def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path: str, force: bool):
+def categorize_transaction(
+    ctx, transaction_ids: tuple[int, ...], category_path: str, force: bool
+):
     """Assign a category to one or more transactions.
 
     Examples:
@@ -24,6 +32,7 @@ def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path:
     try:
         # Try to get category to validate it exists
         from trackit.domain.category import CategoryService
+
         category_service = CategoryService(db)
         category = category_service.get_category_by_path(category_path)
         if category is None:
@@ -50,7 +59,9 @@ def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path:
     errors = []
 
     if len(unique_ids) > 1:
-        click.echo(f"Categorizing {len(unique_ids)} transactions as '{category_path}'...")
+        click.echo(
+            f"Categorizing {len(unique_ids)} transactions as '{category_path}'..."
+        )
 
     for txn_id in unique_ids:
         try:
@@ -61,7 +72,9 @@ def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path:
                     raise ValueError(f"Transaction {txn_id} not found")
                 if txn.category_id is not None:
                     # Get current category path for error message
-                    current_path = category_service.format_category_path(txn.category_id)
+                    current_path = category_service.format_category_path(
+                        txn.category_id
+                    )
                     error_msg = f"Transaction {txn_id} already has category '{current_path}'. Use --force to recategorize."
                     errors.append((txn_id, error_msg))
                     if len(unique_ids) > 1:
@@ -75,7 +88,7 @@ def categorize_transaction(ctx, transaction_ids: tuple[int, ...], category_path:
                 click.echo(f"Transaction {txn_id} categorized as '{category_path}'")
             else:
                 click.echo(f"✓ Transaction {txn_id} categorized")
-        except ValueError as e:
+        except (DomainError, ValueError) as e:
             errors.append((txn_id, str(e)))
             if len(unique_ids) > 1:
                 click.echo(f"✗ Transaction {txn_id}: {e}")
@@ -122,13 +135,11 @@ def update_notes(ctx, transaction_id: int, notes: str, clear: bool):
             click.echo(f"Updated notes for transaction {transaction_id}")
         else:
             click.echo(f"Cleared notes for transaction {transaction_id}")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 def register_commands(cli):
     """Register categorize and notes commands with main CLI."""
     cli.add_command(categorize_transaction)
     cli.add_command(update_notes)
-

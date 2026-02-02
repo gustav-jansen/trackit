@@ -7,6 +7,8 @@ from trackit.domain.transaction import TransactionService
 from trackit.domain.account import AccountService
 from trackit.domain.category import CategoryService
 from trackit.cli.account_resolution import resolve_account_or_exit
+from trackit.cli.error_handling import handle_domain_error
+from trackit.domain.errors import DomainError
 from trackit.utils.date_parser import parse_date
 from trackit.utils.amount_parser import parse_amount
 
@@ -74,9 +76,8 @@ def add_transaction(
     if category:
         try:
             category_obj = category_service.require_category_by_path(category)
-        except ValueError as e:
-            click.echo(f"Error: {e}", err=True)
-            ctx.exit(1)
+        except (DomainError, ValueError) as e:
+            handle_domain_error(ctx, e)
         category_id = category_obj.id
 
     # Generate unique_id if not provided
@@ -106,9 +107,8 @@ def add_transaction(
             click.echo(f"  Description: {description}")
         if category:
             click.echo(f"  Category: {category}")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 def register_commands(cli):

@@ -2,6 +2,7 @@
 
 import click
 from trackit.domain.category import CategoryService
+from trackit.domain.errors import DomainError
 
 
 # Initial category tree structure
@@ -71,9 +72,13 @@ def init_categories(ctx, force: bool):
 
     # Create categories in order: parents first, then children
     # First pass: create root categories
-    root_categories = [(name, parent) for name, parent in INITIAL_CATEGORIES if parent is None]
+    root_categories = [
+        (name, parent) for name, parent in INITIAL_CATEGORIES if parent is None
+    ]
     # Second pass: create child categories
-    child_categories = [(name, parent) for name, parent in INITIAL_CATEGORIES if parent is not None]
+    child_categories = [
+        (name, parent) for name, parent in INITIAL_CATEGORIES if parent is not None
+    ]
 
     created = 0
     errors = 0
@@ -82,11 +87,18 @@ def init_categories(ctx, force: bool):
     for category_name, parent_name in root_categories:
         try:
             # Set Income category to type 1 (Income), all others default to 0 (Expense)
-            category_type = 1 if category_name == "Income" else None  # None uses default (Expense)
-            service.create_category(name=category_name, parent_path=None, category_type=category_type)
+            category_type = (
+                1 if category_name == "Income" else None
+            )  # None uses default (Expense)
+            service.create_category(
+                name=category_name, parent_path=None, category_type=category_type
+            )
             created += 1
-        except ValueError as e:
-            click.echo(f"Warning: Could not create category '{category_name}': {e}", err=True)
+        except (DomainError, ValueError) as e:
+            click.echo(
+                f"Warning: Could not create category '{category_name}': {e}",
+                err=True,
+            )
             errors += 1
 
     # Then create child categories
@@ -94,11 +106,18 @@ def init_categories(ctx, force: bool):
         try:
             # Children inherit parent type, but we need to check if parent is Income
             # For Income subcategories, set type to 1 (Income)
-            category_type = 1 if parent_name == "Income" else None  # None uses default (Expense)
-            service.create_category(name=category_name, parent_path=parent_name, category_type=category_type)
+            category_type = (
+                1 if parent_name == "Income" else None
+            )  # None uses default (Expense)
+            service.create_category(
+                name=category_name, parent_path=parent_name, category_type=category_type
+            )
             created += 1
-        except ValueError as e:
-            click.echo(f"Warning: Could not create category '{category_name}': {e}", err=True)
+        except (DomainError, ValueError) as e:
+            click.echo(
+                f"Warning: Could not create category '{category_name}': {e}",
+                err=True,
+            )
             errors += 1
 
     if errors == 0:
@@ -110,4 +129,3 @@ def init_categories(ctx, force: bool):
 def register_commands(cli):
     """Register init-categories command with main CLI."""
     cli.add_command(init_categories)
-

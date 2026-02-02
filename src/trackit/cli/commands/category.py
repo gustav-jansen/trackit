@@ -3,6 +3,8 @@
 import click
 from trackit.domain.category import CategoryService
 from trackit.domain.entities import CategoryTreeNode
+from trackit.cli.error_handling import handle_domain_error
+from trackit.domain.errors import DomainError
 
 
 def print_category_tree(categories: list[CategoryTreeNode], indent: int = 0) -> None:
@@ -64,9 +66,8 @@ def create_category(ctx, name: str, parent: str, category_type: str):
         )
         parent_str = f" under '{parent}'" if parent else ""
         click.echo(f"Created category '{name}'{parent_str} (ID: {category_id})")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 def register_commands(cli):

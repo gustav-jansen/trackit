@@ -3,6 +3,8 @@
 import click
 from trackit.domain.account import AccountService
 from trackit.cli.account_resolution import resolve_account_or_exit
+from trackit.cli.error_handling import handle_domain_error
+from trackit.domain.errors import DomainError
 
 
 @click.group()
@@ -36,9 +38,8 @@ def create_account(ctx, name: str, bank: str | None):
         click.echo(f"Created account '{name}' (ID: {account_id})")
         if bank is None:
             click.echo(f"Bank name set to '{bank_name}'")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 @account_group.command("list")
@@ -85,9 +86,8 @@ def rename_account(ctx, account: str, new_name: str, bank: str | None) -> None:
         click.echo(f"Renamed account to '{new_name}'")
         if bank is not None:
             click.echo(f"Bank name updated to '{bank}'")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 @account_group.command("delete")
@@ -146,9 +146,8 @@ def delete_account(ctx, account: str) -> None:
     try:
         service.delete_account(account_id)
         click.echo(f"Deleted account '{account_obj.name}'")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 def register_commands(cli):

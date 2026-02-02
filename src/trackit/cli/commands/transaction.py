@@ -8,6 +8,8 @@ from trackit.domain.account import AccountService
 from trackit.domain.category import CategoryService
 from trackit.cli.date_filters import resolve_cli_date_range
 from trackit.cli.account_resolution import resolve_account_or_exit
+from trackit.cli.error_handling import handle_domain_error
+from trackit.domain.errors import DomainError
 from trackit.utils.date_parser import parse_date
 from trackit.utils.amount_parser import parse_amount
 
@@ -109,9 +111,8 @@ def update_transaction(
             clear_category=clear_category,
         )
         click.echo(f"Updated transaction {transaction_id}")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 @transaction_group.command("list")
@@ -293,9 +294,8 @@ def delete_transaction(ctx, transaction_id: int) -> None:
     try:
         transaction_service.delete_transaction(transaction_id)
         click.echo(f"Deleted transaction {transaction_id}")
-    except ValueError as e:
-        click.echo(f"Error: {e}", err=True)
-        ctx.exit(1)
+    except (DomainError, ValueError) as e:
+        handle_domain_error(ctx, e)
 
 
 def register_commands(cli: click.Group) -> None:
