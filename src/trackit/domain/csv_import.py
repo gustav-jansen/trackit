@@ -11,6 +11,7 @@ from trackit.database.base import Database
 from trackit.domain.transaction import TransactionService
 from trackit.domain.account import AccountService
 from trackit.domain.csv_format import CSVFormatService
+from trackit.domain.errors import NotFoundError, ValidationError
 from trackit.utils.date_parser import parse_date
 from trackit.utils.amount_parser import parse_amount
 
@@ -67,12 +68,12 @@ class CSVImportService:
         # Get format
         fmt = self.format_service.get_format_by_name(format_name)
         if fmt is None:
-            raise ValueError(f"CSV format '{format_name}' not found")
+            raise NotFoundError(f"CSV format '{format_name}' not found")
 
         # Validate format
         is_valid, missing = self.format_service.validate_format(fmt.id)
         if not is_valid:
-            raise ValueError(
+            raise ValidationError(
                 f"CSV format '{format_name}' is missing required mappings: {', '.join(missing)}"
             )
 
@@ -105,7 +106,7 @@ class CSVImportService:
             # Validate required columns exist
             csv_columns = reader.fieldnames
             if csv_columns is None:
-                raise ValueError("CSV file has no columns")
+                raise ValidationError("CSV file has no columns")
 
             # Determine required columns based on format type
             if fmt.is_debit_credit_format:
@@ -118,18 +119,22 @@ class CSVImportService:
             }
             missing_columns = required_csv_columns - set(csv_columns)
             if missing_columns:
-                raise ValueError(
+                raise ValidationError(
                     f"CSV file missing required columns: {', '.join(missing_columns)}"
                 )
 
             # Process each row
-            for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
+            for row_num, row in enumerate(
+                reader, start=2
+            ):  # Start at 2 (header is row 1)
                 try:
                     # Extract values using mappings
                     values = {}
                     for csv_col, db_field in column_map.items():
                         if csv_col in row:
-                            values[db_field] = row[csv_col].strip() if row[csv_col] else None
+                            values[db_field] = (
+                                row[csv_col].strip() if row[csv_col] else None
+                            )
                         else:
                             values[db_field] = None
 
@@ -162,11 +167,15 @@ class CSVImportService:
                         has_credit = credit_str and credit_str.strip()
 
                         if not has_debit and not has_credit:
-                            errors.append(f"Row {row_num}: Missing both debit and credit values (exactly one required)")
+                            errors.append(
+                                f"Row {row_num}: Missing both debit and credit values (exactly one required)"
+                            )
                             continue
 
                         if has_debit and has_credit:
-                            errors.append(f"Row {row_num}: Both debit and credit have values (exactly one required)")
+                            errors.append(
+                                f"Row {row_num}: Both debit and credit have values (exactly one required)"
+                            )
                             continue
 
                         # Parse the value that exists
@@ -174,17 +183,27 @@ class CSVImportService:
                             try:
                                 debit_amount = parse_amount(debit_str)
                                 # Apply negation if configured
-                                amount = -debit_amount if fmt.negate_debit else debit_amount
+                                amount = (
+                                    -debit_amount if fmt.negate_debit else debit_amount
+                                )
                             except ValueError as e:
-                                errors.append(f"Row {row_num}: Invalid debit value: {e}")
+                                errors.append(
+                                    f"Row {row_num}: Invalid debit value: {e}"
+                                )
                                 continue
                         else:  # has_credit
                             try:
                                 credit_amount = parse_amount(credit_str)
                                 # Apply negation if configured
-                                amount = -credit_amount if fmt.negate_credit else credit_amount
+                                amount = (
+                                    -credit_amount
+                                    if fmt.negate_credit
+                                    else credit_amount
+                                )
                             except ValueError as e:
-                                errors.append(f"Row {row_num}: Invalid credit value: {e}")
+                                errors.append(
+                                    f"Row {row_num}: Invalid credit value: {e}"
+                                )
                                 continue
                     else:
                         # Regular format: read from amount column
@@ -207,7 +226,9 @@ class CSVImportService:
                                 f"Row {row_num}: Missing description (required when unique_id is not provided)"
                             )
                             continue
-                        unique_id = self._generate_unique_id(txn_date, description, amount)
+                        unique_id = self._generate_unique_id(
+                            txn_date, description, amount
+                        )
 
                     # Use the account from the format (account_name is not read from CSV)
                     account_id = fmt.account_id
@@ -215,21 +236,25 @@ class CSVImportService:
                     # Verify account still exists
                     account = self.account_service.get_account(account_id)
                     if account is None:
-                        errors.append(f"Row {row_num}: Format's account {account_id} no longer exists")
+                        errors.append(
+                            f"Row {row_num}: Format's account {account_id} no longer exists"
+                        )
                         continue
 
                     # Check for duplicate
                     if self.db.transaction_exists(account_id, unique_id):
                         skipped += 1
-                        skipped_details.append({
-                            "row_num": row_num,
-                            "reason": "Duplicate transaction",
-                            "details": {
-                                "date": str(txn_date),
-                                "description": values.get("description", ""),
-                                "amount": str(amount),
-                            },
-                        })
+                        skipped_details.append(
+                            {
+                                "row_num": row_num,
+                                "reason": "Duplicate transaction",
+                                "details": {
+                                    "date": str(txn_date),
+                                    "description": values.get("description", ""),
+                                    "amount": str(amount),
+                                },
+                            }
+                        )
                         continue
 
                     # Create transaction
@@ -255,4 +280,3 @@ class CSVImportService:
             "skipped_details": skipped_details,
             "errors": errors,
         }
-

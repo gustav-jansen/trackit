@@ -11,6 +11,9 @@ from trackit.domain.errors import (
     category_not_found,
     category_path_not_found,
     duplicate_transaction_unique_id,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
 )
 
 
@@ -57,17 +60,17 @@ class TransactionService:
         # Verify account exists
         account = self.db.get_account(account_id)
         if account is None:
-            raise ValueError(account_not_found(account_id))
+            raise NotFoundError(account_not_found(account_id))
 
         # Check for duplicate
         if self.db.transaction_exists(account_id, unique_id):
-            raise ValueError(duplicate_transaction_unique_id(unique_id, account_id))
+            raise ConflictError(duplicate_transaction_unique_id(unique_id, account_id))
 
         # Verify category if provided
         if category_id is not None:
             category = self.db.get_category(category_id)
             if category is None:
-                raise ValueError(category_not_found(category_id))
+                raise NotFoundError(category_not_found(category_id))
 
         return self.db.create_transaction(
             unique_id=unique_id,
@@ -106,13 +109,13 @@ class TransactionService:
         # Verify transaction exists
         txn = self.db.get_transaction(transaction_id)
         if txn is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            raise NotFoundError(f"Transaction {transaction_id} not found")
 
         category_id = None
         if category_path is not None:
             category = self.db.get_category_by_path(category_path)
             if category is None:
-                raise ValueError(category_path_not_found(category_path))
+                raise NotFoundError(category_path_not_found(category_path))
             category_id = category.id
 
         self.db.update_transaction_category(transaction_id, category_id)
@@ -130,7 +133,7 @@ class TransactionService:
         # Verify transaction exists
         txn = self.db.get_transaction(transaction_id)
         if txn is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            raise NotFoundError(f"Transaction {transaction_id} not found")
 
         self.db.update_transaction_notes(transaction_id, notes)
 
@@ -165,25 +168,25 @@ class TransactionService:
         # Verify transaction exists
         txn = self.db.get_transaction(transaction_id)
         if txn is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            raise NotFoundError(f"Transaction {transaction_id} not found")
 
         # Verify account if provided
         if account_id is not None:
             account = self.db.get_account(account_id)
             if account is None:
-                raise ValueError(account_not_found(account_id))
+                raise NotFoundError(account_not_found(account_id))
 
         # Handle category update or clear
         if clear_category:
             if category_id is not None:
-                raise ValueError("Cannot set both category_id and clear_category")
+                raise ValidationError("Cannot set both category_id and clear_category")
             category_id_to_update = None
             update_category_flag = True
         elif category_id is not None:
             # Verify category exists
             category = self.db.get_category(category_id)
             if category is None:
-                raise ValueError(category_not_found(category_id))
+                raise NotFoundError(category_not_found(category_id))
             category_id_to_update = category_id
             update_category_flag = False
         else:
@@ -215,7 +218,7 @@ class TransactionService:
         # Verify transaction exists
         txn = self.db.get_transaction(transaction_id)
         if txn is None:
-            raise ValueError(f"Transaction {transaction_id} not found")
+            raise NotFoundError(f"Transaction {transaction_id} not found")
 
         self.db.delete_transaction(transaction_id)
 
